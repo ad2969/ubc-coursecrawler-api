@@ -3,8 +3,8 @@ from .models import Department
 
 class DepartmentSerializer(serializers.ModelSerializer):
     key = serializers.CharField(max_length=8, required=True)
-    name = serializers.CharField(max_length=255, required=True)
-    faculty = serializers.CharField(max_length=255, required=False)
+    name = serializers.CharField(max_length=255)
+    faculty = serializers.CharField(max_length=255)
 
     class Meta:
         model = Department

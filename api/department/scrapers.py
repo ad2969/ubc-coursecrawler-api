@@ -27,7 +27,7 @@ def scrapeDepartmentInformation():
             })
 
     except Exception as e:
-        print('ERROR ->>> could not get department info {}'.format(e))
+        print('ERROR ->>> could not get department info.',  '{}'.format(e))
         traceback.print_exc()
         raise
     finally:

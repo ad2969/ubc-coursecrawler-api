@@ -18,7 +18,8 @@ def createOneDepartment(data):
             serializer.save()
         return serializer.data
 
-    except:
+    except Exception as e:
+        print('ERROR ->>> creating department.', '{}'.format(e))
         return False
 
 def updateDepartment(id, data):
@@ -28,5 +29,6 @@ def updateDepartment(id, data):
         item.faculty = data['faculty']
         return item
 
-    except:
+    except Exception as e:
+        print('ERROR ->>> updating department.', '{}'.format(e))
         return False
