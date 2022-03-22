@@ -1,30 +1,37 @@
 from rest_framework import serializers
-from .models import Course, CoursePrereqRelationships
+from .models import Course, CoursePrereqRelationships, Department
 from api.department.serializers import DepartmentSerializer
+from api.department._utils import getOneDepartment
 
 class CourseSerializer(serializers.ModelSerializer):
-    key = serializers.CharField(max_length=8, required=True)
+    key = serializers.CharField(max_length=10, required=True)
+
+    class Meta:
+        model = Course
+        fields = ('key')
+class CourseSerializer(serializers.ModelSerializer):
+    key = serializers.CharField(max_length=10, required=True)
     department = DepartmentSerializer(many=False, required=True)
     courseNum = serializers.IntegerField(required=True)
-    prereqs = serializers.SlugRelatedField(
-        many = True,
-        slug_field=CoursePrereqRelationships.dependent,
-        read_only=True,
-    )
-    dependents = serializers.SlugRelatedField(
-        many = True,
-        slug_field=CoursePrereqRelationships.prereq,
-        read_only=True,
-    )
-    coreqs = serializers.SlugRelatedField(
-        many = True,
-        slug_field=Course.key,
-        read_only=True,
-    )
+    coreqs = CourseSerializer(many = True, required=False)
+    prereqs = CourseSerializer(many = True, required=False)
 
     class Meta:
         model = Course
         fields = ('__all__')
+
+    def create(self, validated_data):
+        departmentKey = validated_data.pop('department')
+        departmentKey = departmentKey['key']
+        prereqData = validated_data.pop('prereqs')
+        # coreqData = validated_data.pop('coreqs')
+        course = Course.objects.create(
+            department=Department.objects.get(key=departmentKey),
+            **validated_data
+        )
+        # for prereq in prereqData:
+
+        return course
 
 class CoursePrereqRelationshipsSerializer(serializers.ModelSerializer):
     group = serializers.IntegerField(default=0)

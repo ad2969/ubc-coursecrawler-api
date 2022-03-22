@@ -8,6 +8,7 @@ from bs4 import BeautifulSoup
 import re
 import copy
 
+from api.department._utils import getOneDepartment, createOneDepartment
 from ..utils.selenium import driver
 from ..utils.url import generateUrl
 
@@ -31,7 +32,12 @@ def filterCoreqContainer(tag):
     return tag.name == 'p' and len(tag.contents) and RE_STRING_COREQ.match(tag.contents[0].get_text())
 
 def checkCourseNotOffered(container):
-    return any(RE_STRING_NOOFFER.search(content.get_text()) for content in container.contents)
+    try:
+        return any(RE_STRING_NOOFFER.search(content.get_text()) for content in container.contents)
+    except:
+        print('ERROR ->>> page layout unrecognized')
+        print(container)
+        raise
 
 def checkNumberOfCoursesRequired(line):
     for NUM_CRIT in RE_STRING_REQUIRED_COURSES:
@@ -63,8 +69,8 @@ def getCoursePrereqs(courseKey, container):
         prereqGroups.append({
             'group': prereqGroupCounter,
             'numRequired': requiredCourses,
-            'prereq': currLine.get_text().strip().replace(" ", "-").upper(),
-            'dependent': courseKey,
+            'prereq': currLine.get_text().strip().replace(' ', '-').upper(),
+            'dependent': courseKey.upper(),
         })
 
     return prereqGroups
@@ -72,13 +78,13 @@ def getCoursePrereqs(courseKey, container):
 def getCourseCoreqs(container):
     return [coreq.get_text().strip() for coreq in container.find_all('a')]
 
-def findCourseDependencies(allCoursesEncountered, allCourseInfo, dept: str, courseNum: str):
+def findCourseDependencies(allCoursesEncountered, allCourseInfo, departmentInfo, dept: str, courseNum: str):
     # if already have data, don't repeat the computation
-    courseKey = (dept+'-'+courseNum).lower()
+    courseKey = (dept+'-'+courseNum).upper()
     if courseKey in allCourseInfo: return allCourseInfo[courseKey]
 
     # add to list of courses encountered so far
-    courseInfo = { 'dept': dept, 'courseNum': courseNum,'status': 'OFFERED',  'prereqs': [], 'coreqs': []}
+    courseInfo = { 'key': courseKey, 'department': dept.upper(), 'courseNum': courseNum,'status': 'OFFERED',  'prereqs': [], 'coreqs': []}
     newCoursesEncountered = [*allCoursesEncountered, courseKey]
 
     try:
@@ -88,6 +94,7 @@ def findCourseDependencies(allCoursesEncountered, allCourseInfo, dept: str, cour
         content_container = soup.find('div', class_=re.compile('content expand'))
 
         # check if course is offered
+
         if checkCourseNotOffered(content_container):
             courseInfo['status'] = 'NOT_OFFERED'
             return courseInfo
@@ -96,11 +103,6 @@ def findCourseDependencies(allCoursesEncountered, allCourseInfo, dept: str, cour
         prereqContainer = content_container.find_all(filterPrereqContainer)
         coreqContainer = content_container.find_all(filterCoreqContainer)
 
-        if not len(prereqContainer) and not len(coreqContainer):
-            # course has no prereqs/coreqs, end here
-            print(f'DEBUG (scrape_course): course {dept} {courseNum} has no prereqs/coreqs')
-            return courseInfo
-        
         # get list of prereqs and coreqs
         prereqs = [] if not len(prereqContainer) else getCoursePrereqs(courseKey, prereqContainer[0]) 
         coreqs = [] if not len(coreqContainer) else getCourseCoreqs(coreqContainer[0]) 
@@ -114,32 +116,42 @@ def findCourseDependencies(allCoursesEncountered, allCourseInfo, dept: str, cour
         if len(prereqs):
             for idx, p in enumerate(prereqs):
                 pr = p['prereq'].split('-')
-                prInfo = findCourseDependencies(newCoursesEncountered, allCourseInfo, pr[0], pr[1])
+                prInfo = findCourseDependencies(newCoursesEncountered, allCourseInfo, departmentInfo, pr[0], pr[1])
                 courseInfo['prereqs'][idx]['prereqInfo'] = prInfo
         else:
             print(f'DEBUG (scrape_course): no prereqs found for {dept} {courseNum}')
-
         # don't need to recurse for coreqs
 
     except Exception as e:
-        print('ERROR ->>> could not find dependency for', f'{dept} {courseNum}',  '{}'.format(e))
         traceback.print_exc()
+        raise
     finally:
+        # get department info
+        if dept in departmentInfo:
+            deptInfo = departmentInfo[dept]
+        else:
+            deptInfo = getOneDepartment(dept)
+            # TODO: NEED TO NOTIFY ADMIN THAT A MISSING DEPARTMENT WAS CREATED
+            if not deptInfo: deptInfo = createOneDepartment({ 'key': dept })
+            departmentInfo[dept] = deptInfo # save into memo
+
+        courseInfo['department'] = deptInfo
         return courseInfo
 
 def scrapeCourseInformation(dept: str, courseNum: str):
     allCourseInfo = {}
     mainCourseInfo = {}
+    departmentInfo = {}
 
     try:
         # do this initially to test connection
         driver.get(generateUrl('COURSES', dept, courseNum))
         # start finding dependencies
-        mainCourseInfo = findCourseDependencies([], allCourseInfo, dept, courseNum)
+        mainCourseInfo = findCourseDependencies([], allCourseInfo, departmentInfo, dept.upper(), courseNum)
     except Exception as e:
         print('ERROR ->>> could not scrape course page. {}'.format(e))
         traceback.print_exc()
         raise
     finally:
         print(allCourseInfo)
-        return mainCourseInfo
+        return mainCourseInfo, allCourseInfo
