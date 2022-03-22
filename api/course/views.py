@@ -28,9 +28,8 @@ class CourseDetailView(APIView):
         try:
             # item = Course.objects.get(id=id)
             # serializer = CourseSerializer(item)
-            courseKey = id.lower().split('-')
+            courseKey = id.upper().split('-')
             data = scrapeCourseInformation(courseKey[0],courseKey[1])
-            print(data)
 
             return Response({
                     'status': 'success',

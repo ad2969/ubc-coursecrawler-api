@@ -63,7 +63,7 @@ def getCoursePrereqs(courseKey, container):
         prereqGroups.append({
             'group': prereqGroupCounter,
             'numRequired': requiredCourses,
-            'prereq': currLine.get_text().strip().replace(" ", "-").lower(),
+            'prereq': currLine.get_text().strip().replace(" ", "-").upper(),
             'dependent': courseKey,
         })
 
