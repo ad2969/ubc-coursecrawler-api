@@ -1,0 +1,1 @@
+DEPARTMENT_PREFIX = 'dept'
