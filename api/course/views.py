@@ -1,22 +1,17 @@
+import traceback
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from .models import Course
-from .serializers import CourseSerializer
-from .scrapers import scrapeCourseInformation
-from ._utils import saveMultipleCourses, getOneCourse
 from api.utils.response import ResponseThen, ResponseError
+from api.redis.prefixes import COURSE_PREFIX
+from api.redis.utils import getAll, getOne, setMultiple, deleteAll
+from .scrapers import scrapeCourseInformation
 
 class CourseListView(APIView):
     def get(self, request):
         try:
-            items = Course.objects.all()
-            json = CourseSerializer(items, many=True)
-
-            return Response({
-                'status': 'success',
-                'data': json.data
-            }, status=status.HTTP_200_OK)
+            response = getAll(COURSE_PREFIX)
+            return Response(response, status=response['code'])
 
         except ResponseError as e:
             return Response({
@@ -30,6 +25,40 @@ class CourseListView(APIView):
                 'data': e,
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+    # admin use, requires secret
+    def post(self, request):
+        if 'secret' not in request.data or 'method' not in request.data:
+            return Response({
+                'status': 'REQUEST ERROR',
+                'msg': 'no method or secret'
+            }, status = status.HTTP_400_BAD_REQUEST)
+
+        try:
+            method = request.data['method']
+
+            if method != 'CLEAN':
+                return Response({
+                    'status': 'REQUEST ERROR',
+                    'msg': 'invalid method'
+                }, status = status.HTTP_400_BAD_REQUEST)
+            else:
+                response = deleteAll(COURSE_PREFIX)
+
+                return Response(response, status=response['code'])
+
+        except ResponseError as e:
+            return Response({
+                'status': e.status,
+                'msg': e.message,
+            }, status=e.statusCode)
+
+        except Exception as e:
+            traceback.print_exc()
+            return Response({
+                'status': 'internal error',
+                'msg': e,
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 class CourseDetailView(APIView):
     def get(self, request, id=None):
         forceScrapeParam = request.query_params.get('forceScrape') # to force a scrape
@@ -40,32 +69,29 @@ class CourseDetailView(APIView):
             
             # if exists in the database
             if not forceScrapeParam:
-                existingCourse = getOneCourse(id, True)
+                existingCourse = getOne(COURSE_PREFIX, id.upper())
 
-                # if exists in the database
-                if existingCourse:
-                    # recursivelyGetPrereqs(existingCourse)
-                    json = CourseSerializer
-
-                    return Response({
-                        'status': 'success',
-                        'data': existingCourse
-                    }, status=status.HTTP_200_OK)
+                # if exists in redis
+                if existingCourse['data']:
+                    return Response(existingCourse, status=existingCourse['code'])
 
             # scrape course information
-            data, fullData = scrapeCourseInformation(courseKey[0],courseKey[1])
+            data, newData = scrapeCourseInformation(courseKey[0],courseKey[1])
 
             if preventSaveParam: # do not save scrape result
                 return Response({
                     'status': 'success',
-                    'data': data
+                    'data': data,
+                    'msg': 'scraped, data will not be saved',
                 }, status=status.HTTP_200_OK)
-            else: # save scrape result
-                def tempCallback(): saveMultipleCourses(fullData.values())
-                return ResponseThen({
-                    'status': 'scrape success',
-                    'data': data
-                }, tempCallback, status=status.HTTP_201_CREATED)
+            
+             # save scrape result
+            def tempCallback(): setMultiple(COURSE_PREFIX, newData)
+            return ResponseThen({
+                'status': 'scrape success',
+                'data': data,
+                'msg': f'scraped, {len(newData)} new data will be saved',
+            }, tempCallback, status=status.HTTP_201_CREATED)
 
         except ResponseError as e:
             return Response({

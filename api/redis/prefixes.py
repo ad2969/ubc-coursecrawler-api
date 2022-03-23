@@ -1,1 +1,2 @@
 DEPARTMENT_PREFIX = 'dept'
+COURSE_PREFIX = 'course'

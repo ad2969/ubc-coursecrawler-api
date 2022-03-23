@@ -2,7 +2,8 @@ from django.db import models
 from api.department.models import Department
 
 class Course(models.Model):
-    key = models.CharField(max_length=10, primary_key=True)
+    rkey = models.CharField(max_length=17, primary_key=True)
+    key = models.CharField(max_length=10)
     department = models.ForeignKey(Department, blank=False, on_delete=models.CASCADE)
     courseNum = models.IntegerField(blank=False)
     coreqs = models.ManyToManyField('self', symmetrical=True, null=True, blank=True)
