@@ -3,22 +3,28 @@ import traceback
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
+from api.utils.response import ResponseError
 from .models import Department
 from .serializers import DepartmentSerializer
 from .scrapers import scrapeDepartmentInformation
 from ._utils import getOneDepartment, createOneDepartment, updateDepartment
-# from django.shortcuts import get_object_or_404
 
 class DepartmentListView(APIView):
     def get(self, request):
         try:
             items = Department.objects.all()
-            serializer = DepartmentSerializer(items, many=True)
+            json = DepartmentSerializer(items, many=True)
 
             return Response({
                 'status': 'success',
-                'data': serializer.data
+                'data': json.data
             }, status=status.HTTP_200_OK)
+
+        except ResponseError as e:
+            return Response({
+                'status': e.status,
+                'data': e.message,
+            }, status=e.statusCode)
 
         except Exception as e:
             traceback.print_exc()
@@ -70,6 +76,12 @@ class DepartmentListView(APIView):
                     'data': 'deleted department tables'
                 }, status = status.HTTP_205_RESET_CONTENT)
 
+        except ResponseError as e:
+            return Response({
+                'status': e.status,
+                'data': e.message,
+            }, status=e.statusCode)
+
         except Exception as e:
             traceback.print_exc()
             return Response({
@@ -81,11 +93,18 @@ class DepartmentDetailView(APIView):
     def get(self, request, id=None):
         try:
             item = getOneDepartment(id)
+            json = DepartmentSerializer(item if item else {})
 
             return Response({
                     'status': 'success' if item else 'not found',
-                    'data': item
+                    'data': json.data,
                 }, status=status.HTTP_200_OK)
+
+        except ResponseError as e:
+            return Response({
+                'status': e.status,
+                'data': e.message,
+            }, status=e.statusCode)
 
         except Exception as e:
             traceback.print_exc()
@@ -110,7 +129,7 @@ class DepartmentDetailView(APIView):
 
     # def delete(self, request, id=None):
     #     if id:
-    #         item = get_object_or_404(Department, key=id)
+    #         item = getOneDepartment(key=id)
     #         item.delete()
     #         return Response({
     #             'status': 'success',
