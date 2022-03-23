@@ -11,6 +11,7 @@ ipdb = "*"
 djangorestframework = "*"
 django = "*"
 django-cors-headers = "*"
+redis = "*"
 
 [dev-packages]
 pylint = "*"

@@ -27,6 +27,9 @@ DEBUG = True
 
 ALLOWED_HOSTS = []
 
+# Redis Database
+REDIS_HOST = 'redis-12422.c241.us-east-1-4.ec2.cloud.redislabs.com'
+REDIS_PORT = 12422
 
 # Application definition
 
