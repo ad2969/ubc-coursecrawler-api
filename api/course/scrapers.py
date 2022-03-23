@@ -10,6 +10,7 @@ from bs4 import BeautifulSoup
 
 from api.redis.utils import getOne
 from api.redis.prefixes import COURSE_PREFIX
+from api.utils.exceptions import PageError
 from ..utils.selenium import driver
 from ..utils.url import generateUrl
 
@@ -92,7 +93,7 @@ def findCourseDependencies(courseCache, newCourses, dept: str, courseNum: str):
             courseCache[courseKey] = existing['data']
             return existing['data']
 
-    except Exception as e:
+    except Exception as e:  # exception here means something happened with redis
         traceback.print_exc()
         raise
 
@@ -113,11 +114,24 @@ def findCourseDependencies(courseCache, newCourses, dept: str, courseNum: str):
         soup = BeautifulSoup(driver.page_source, 'html.parser')
         content_container = soup.find('div', class_=re.compile('content expand'))
 
+        if not content_container: # means something is wrong with the page
+            raise PageError('Page layout unrecognized')
+
         # check if course is offered
         if checkCourseNotOffered(content_container):
             courseInfo['status'] = 'NOT_OFFERED'
             print(f'DEBUG (scrape_course): {dept} {courseNum} not offered')
+            
+            # save into cache and new data for redis
+            courseCache[courseKey] = courseInfo
+            newCourses[rCourseKey] = json.dumps(courseInfo)
             return courseInfo
+
+    except Exception as e: # exception here usually means that the page is unrecognizable
+        traceback.print_exc()
+        raise
+
+    try:
 
         # get prereq containers and coreq containers, if any
         prereqContainer = content_container.find_all(filterPrereqContainer)
@@ -159,10 +173,17 @@ def scrapeCourseInformation(dept: str, courseNum: str):
         driver.get(generateUrl('COURSES', dept, courseNum))
         # start finding dependencies
         mainCourseInfo = findCourseDependencies(courseCache, newCourses, dept.upper(), courseNum)
+
+    except PageError as e:
+        print('ERROR ->>> cannot find page layout. {}'.format(e))
+        traceback.print_exc()
+        raise e
+
     except Exception as e:
         print('ERROR ->>> could not scrape course page. {}'.format(e))
         traceback.print_exc()
         raise
+
     finally:
         print(mainCourseInfo)
         return mainCourseInfo, newCourses

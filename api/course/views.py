@@ -2,6 +2,7 @@ import traceback
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
+from api.utils.exceptions import PageError
 from api.utils.response import ResponseThen, ResponseError
 from api.redis.prefixes import COURSE_PREFIX
 from api.redis.utils import getAll, getOne, setMultiple, deleteAll
@@ -21,7 +22,7 @@ class CourseListView(APIView):
 
         except Exception as e:
             return Response({
-                'status': 'internal error',
+                'status': 'INTERNAL ERROR',
                 'data': e,
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -55,7 +56,7 @@ class CourseListView(APIView):
         except Exception as e:
             traceback.print_exc()
             return Response({
-                'status': 'internal error',
+                'status': 'INTERNAL ERROR',
                 'msg': e,
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -80,7 +81,7 @@ class CourseDetailView(APIView):
 
             if preventSaveParam: # do not save scrape result
                 return Response({
-                    'status': 'success',
+                    'status': 'SUCCESS',
                     'data': data,
                     'msg': 'scraped, data will not be saved',
                 }, status=status.HTTP_200_OK)
@@ -88,10 +89,16 @@ class CourseDetailView(APIView):
              # save scrape result
             def tempCallback(): setMultiple(COURSE_PREFIX, newData)
             return ResponseThen({
-                'status': 'scrape success',
+                'status': 'SCRAPE SUCCESS',
                 'data': data,
                 'msg': f'scraped, {len(newData)} new data will be saved',
             }, tempCallback, status=status.HTTP_201_CREATED)
+
+        except PageError as e:
+            return Response({
+                'status': 'INTERNAL ERROR',
+                'msg': e.message,
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         except ResponseError as e:
             return Response({
@@ -101,6 +108,6 @@ class CourseDetailView(APIView):
 
         except Exception as e:
             return Response({
-                'status': 'internal error',
+                'status': 'INTERNAL ERROR',
                 'data': e,
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
