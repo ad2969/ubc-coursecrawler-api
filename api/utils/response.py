@@ -11,7 +11,7 @@ class ResponseThen(Response):
         self.then_callback()
 
 class ResponseError(Exception):
-    def __init__(self, statusCode, status, message="Internal error"):
+    def __init__(self, statusCode, status, message='Internal error'):
         self.statusCode = statusCode
         self.status = status
         self.message = message

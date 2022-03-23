@@ -40,7 +40,7 @@ def getOne(prefix: str, key: str):
         return {
             'status': 'SUCCESS',
             'code': status.HTTP_200_OK,
-            'msg': f'key {prefix}:{key} not found',
+            'msg': f'key {prefix}:{key} found',
             'data': value,
         }
 
