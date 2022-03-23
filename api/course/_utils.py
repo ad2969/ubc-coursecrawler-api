@@ -1,19 +1,22 @@
-from django.shortcuts import get_object_or_404
+from rest_framework import status
 from api.department._utils import getOneDepartment
+from api.utils.response import ResponseError
 from .models import Course, CoursePrereqRelationships
 from .serializers import CourseSerializer, CoursePrereqRelationshipsSerializer
 
 def getOneCourse(id, fullData=False):
     try:
-        item = get_object_or_404(Course, key=id.upper())
-        if fullData:
-            data = CourseSerializer(item).data
-            prereqs = CoursePrereqRelationships.objects.get(dependent=id.upper())
-            return data
-        else:
-            return CourseSerializer(item).data
+        item = Course.objects.get(key=id.upper())
+        if not item: return False
 
-    except:
+        if fullData:
+            prereqs = CoursePrereqRelationships.objects.filter(dependent__in=[id.upper()])
+            item['prereqs'] = prereqs
+
+        return item
+
+    except Exception as e:
+        print('ERROR ->>> getting course.', '{}'.format(e))
         return False
 
 def recursivelyGetPrereqs(course):
@@ -21,8 +24,12 @@ def recursivelyGetPrereqs(course):
 
 def createOneCourse(data):
     try:
-        print('CREATING COURSE')
+        existing = Course.get(key=id.upper())
+        if existing: raise ResponseError(status.HTTP_409_CONFLICT, 'KEY CONFLICT', 'course key already exists')
+
         department = getOneDepartment(data['department'])
+        if not department: raise ResponseError(status.HTTP_404_NOT_FOUND, 'NOT FOUND', 'department key no match')
+
         serializer = CourseSerializer(data={
             'key': data['key'].upper(),
             'department': department,
@@ -30,27 +37,26 @@ def createOneCourse(data):
             'coreqs': data['coreqs'],
         })
         if serializer.is_valid():
-            print('** course VALID!')
             serializer.save()
 
-        print('# course either saved/not saved')
         # do prereqs and dependents
         for prereq in data['prereqs']:
             prereqSerializer = CoursePrereqRelationshipsSerializer(data=prereq)
             if prereqSerializer.is_valid():
-                print('** prereq VALID!')
-                # prereqSerializer.save()
+                prereqSerializer.save()
 
         # do coreqs
         return serializer.data
 
     except Exception as e:
         print('ERROR ->>> creating course.', '{}'.format(e))
-        return False
+        raise e
 
 def updateCourse(id, data):
     try:
-        item = get_object_or_404(Course, key=id.upper())
+        item = Course.get(key=id.upper())
+        if not item: raise ResponseError(status.HTTP_404_NOT_FOUND, 'NOT FOUND', 'course key no match')
+
         item.department = data['department']
         item.courseNum = data['courseNum']
         # do prereqs and dependents
@@ -59,16 +65,16 @@ def updateCourse(id, data):
 
     except Exception as e:
         print('ERROR ->>> updating course.', '{}'.format(e))
-        return False
+        raise e
 
 def saveMultipleCourses(courseList):
     try:
-        print('SAVE MULTIPLE')
         for course in courseList:
             existingCourse = getOneCourse(course['key'])
             if existingCourse: updateCourse(course['key'], course)
             else: createOneCourse(course)
         return True
 
-    except:
-        return False
+    except Exception as e:
+        print('ERROR ->>> saving scraoe data.', '{}'.format(e))
+        raise e

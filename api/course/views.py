@@ -4,19 +4,25 @@ from rest_framework import status
 from .models import Course
 from .serializers import CourseSerializer
 from .scrapers import scrapeCourseInformation
-from ._utils import getOneCourse, saveMultipleCourses
-from api.utils.response import ResponseThen
+from ._utils import saveMultipleCourses, getOneCourse
+from api.utils.response import ResponseThen, ResponseError
 
 class CourseListView(APIView):
     def get(self, request):
         try:
             items = Course.objects.all()
-            serializer = CourseSerializer(items, many=True)
+            json = CourseSerializer(items, many=True)
 
             return Response({
                 'status': 'success',
-                'data': serializer.data
+                'data': json.data
             }, status=status.HTTP_200_OK)
+
+        except ResponseError as e:
+            return Response({
+                'status': e.status,
+                'data': e.message,
+            }, status=e.statusCode)
 
         except Exception as e:
             return Response({
@@ -30,32 +36,42 @@ class CourseDetailView(APIView):
         preventSaveParam = request.query_params.get('preventSave') # to prevent saving scraped data
 
         try:
-            # item = Course.objects.get(id=id)
-            # serializer = CourseSerializer(item)
             courseKey = id.split('-')
-            existing = getOneCourse(courseKey)
+            
+            # if exists in the database
+            if not forceScrapeParam:
+                existingCourse = getOneCourse(id, True)
 
-            if existing and not forceScrapeParam:
-                data = existing
+                # if exists in the database
+                if existingCourse:
+                    # recursivelyGetPrereqs(existingCourse)
+                    json = CourseSerializer
 
-                return Response({
-                    'status': 'success',
-                    'data': data
-                }, status=status.HTTP_200_OK)
-            else:
-                data, fullData = scrapeCourseInformation(courseKey[0],courseKey[1])
-                if not preventSaveParam:
-                    def tempCallback(): saveMultipleCourses(fullData.values())
-
-                    return ResponseThen({
+                    return Response({
                         'status': 'success',
-                        'data': data
-                    }, tempCallback, status=status.HTTP_201_CREATED)
+                        'data': existingCourse
+                    }, status=status.HTTP_200_OK)
 
+            # scrape course information
+            data, fullData = scrapeCourseInformation(courseKey[0],courseKey[1])
+
+            if preventSaveParam: # do not save scrape result
                 return Response({
                     'status': 'success',
                     'data': data
                 }, status=status.HTTP_200_OK)
+            else: # save scrape result
+                def tempCallback(): saveMultipleCourses(fullData.values())
+                return ResponseThen({
+                    'status': 'scrape success',
+                    'data': data
+                }, tempCallback, status=status.HTTP_201_CREATED)
+
+        except ResponseError as e:
+            return Response({
+                'status': e.status,
+                'data': e.message,
+            }, status=e.statusCode)
 
         except Exception as e:
             return Response({

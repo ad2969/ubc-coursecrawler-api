@@ -36,7 +36,6 @@ def checkCourseNotOffered(container):
         return any(RE_STRING_NOOFFER.search(content.get_text()) for content in container.contents)
     except:
         print('ERROR ->>> page layout unrecognized')
-        print(container)
         raise
 
 def checkNumberOfCoursesRequired(line):
@@ -78,14 +77,13 @@ def getCoursePrereqs(courseKey, container):
 def getCourseCoreqs(container):
     return [coreq.get_text().strip() for coreq in container.find_all('a')]
 
-def findCourseDependencies(allCoursesEncountered, allCourseInfo, departmentInfo, dept: str, courseNum: str):
+def findCourseDependencies(allCourseInfo, departmentInfo, dept: str, courseNum: str):
     # if already have data, don't repeat the computation
     courseKey = (dept+'-'+courseNum).upper()
     if courseKey in allCourseInfo: return allCourseInfo[courseKey]
 
     # add to list of courses encountered so far
     courseInfo = { 'key': courseKey, 'department': dept.upper(), 'courseNum': courseNum,'status': 'OFFERED',  'prereqs': [], 'coreqs': []}
-    newCoursesEncountered = [*allCoursesEncountered, courseKey]
 
     try:
         # get course info
@@ -116,7 +114,7 @@ def findCourseDependencies(allCoursesEncountered, allCourseInfo, departmentInfo,
         if len(prereqs):
             for idx, p in enumerate(prereqs):
                 pr = p['prereq'].split('-')
-                prInfo = findCourseDependencies(newCoursesEncountered, allCourseInfo, departmentInfo, pr[0], pr[1])
+                prInfo = findCourseDependencies(allCourseInfo, departmentInfo, pr[0], pr[1])
                 courseInfo['prereqs'][idx]['prereqInfo'] = prInfo
         else:
             print(f'DEBUG (scrape_course): no prereqs found for {dept} {courseNum}')
@@ -147,7 +145,7 @@ def scrapeCourseInformation(dept: str, courseNum: str):
         # do this initially to test connection
         driver.get(generateUrl('COURSES', dept, courseNum))
         # start finding dependencies
-        mainCourseInfo = findCourseDependencies([], allCourseInfo, departmentInfo, dept.upper(), courseNum)
+        mainCourseInfo = findCourseDependencies(allCourseInfo, departmentInfo, dept.upper(), courseNum)
     except Exception as e:
         print('ERROR ->>> could not scrape course page. {}'.format(e))
         traceback.print_exc()

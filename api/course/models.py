@@ -18,3 +18,6 @@ class CoursePrereqRelationships(models.Model):
 
     class Meta:
         unique_together = (('prereq', 'dependent'),)
+
+    def __str__(self):
+        return str(self.prereq) + ' --> ' + str(self.dependent)
