@@ -1,7 +1,8 @@
 from django.db import models
 
 class Department(models.Model):
-    key = models.CharField(max_length=8, primary_key=True)
+    rkey = models.CharField(max_length=13, primary_key=True)
+    key = models.CharField(max_length=8)
     name = models.CharField(max_length=255)
     faculty = models.CharField(max_length=255)
 

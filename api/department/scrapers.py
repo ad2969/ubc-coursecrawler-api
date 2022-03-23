@@ -21,8 +21,9 @@ def scrapeDepartmentInformation():
         rows = main_table.find_all('tr')
         
         for row in rows:
-            key = f'{DEPARTMENT_PREFIX}:' + re.sub(RE_STRING_ALLOWED_CHARACTERS, '', row.contents[0].get_text()).strip()
+            key = re.sub(RE_STRING_ALLOWED_CHARACTERS, '', row.contents[0].get_text()).strip()
             departmentInfo.append({
+                'rkey': f'{DEPARTMENT_PREFIX}:{key}',
                 'key': key.upper(),
                 'name': re.sub(RE_STRING_ALLOWED_CHARACTERS, '', row.contents[1].get_text()).strip(),
                 'faculty': re.sub(RE_STRING_ALLOWED_CHARACTERS, '', row.contents[2].get_text()).strip(),

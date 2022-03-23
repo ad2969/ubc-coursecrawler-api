@@ -54,7 +54,7 @@ class DepartmentListView(APIView):
             if method == 'SCRAPE':
                 departments = scrapeDepartmentInformation()
                 response = setMultiple(DEPARTMENT_PREFIX, {
-                    f'{DEPARTMENT_PREFIX}:' + val['key'] : json.dumps(val)
+                    val['rkey'] : json.dumps(val)
                     for val in departments
                 })
 
