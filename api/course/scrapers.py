@@ -45,8 +45,8 @@ def checkNumberOfCoursesRequired(line):
         if NUM_CRIT[1].search(line): return NUM_CRIT[0]
     return -1 # if no match, this line is not a prereq indicator
 
-def getCoursePrereqs(courseKey, container):
-    prereqGroups = [] # collect prereqs
+def getCoursePrereqs(container):
+    prereqs = [] # collect prereqs
     requiredCourses = 0 # number of courses required in the group
     prereqGroupCounter = -1
 
@@ -67,19 +67,60 @@ def getCoursePrereqs(courseKey, container):
         # if its not a link or no indicator yet (weird use case)
         if prereqGroupCounter == -1 or currLine.name != 'a': continue
         # add as a prereq
-        prereqGroups.append({
-            'group': prereqGroupCounter,
-            'numRequired': requiredCourses,
-            'prereq': currLine.get_text().strip().replace(' ', '-').upper(),
-            'dependent': courseKey.upper(),
+        name = currLine.get_text().strip().upper()
+        splitted = name.split(' ')
+        prereqs.append({
+            'dept': splitted[0],
+            'courseNum': splitted[1],
+            'extraAttribs': {
+                'type': 'prereq',
+                'group': prereqGroupCounter,
+                'numRequired': requiredCourses,
+            }
         })
 
-    return prereqGroups
+    return prereqs
 
 def getCourseCoreqs(container):
-    return [(coreq.get_text().strip()).upper() for coreq in container.find_all('a')]
+    coreqs = [] # collect coreqs
+    requiredCourses = 0 # number of courses required in the group
+    coreqGroupCounter = -1
 
-def findCourseDependencies(courseCache, newCourses, dept: str, courseNum: str):
+    for currLine in container:
+        # get number of courses required for this prereq group
+        coursesRequired = checkNumberOfCoursesRequired(currLine.get_text())
+
+        # add to prereq list as necessary
+        if coursesRequired != -1: # if an indicator is given
+            requiredCourses = coursesRequired # save the number of required corses
+            coreqGroupCounter += 1 # increment the group number
+            continue
+        elif coreqGroupCounter == -1: # if no indicator but its the first line
+            requiredCourses = 0
+            coreqGroupCounter += 1
+            continue
+
+        # if its not a link or no indicator yet (weird use case)
+        if coreqGroupCounter == -1 or currLine.name != 'a': continue
+        # add as a prereq
+        name = currLine.get_text().strip().upper()
+        splitted = name.split(' ')
+        coreqs.append({
+            'key': name.replace(' ', '-'),
+            'name': name,
+            'attributes': {
+                'type': 'coreq',
+                'department': splitted[0],
+                'courseNum': splitted[1],
+                'group': coreqGroupCounter,
+                'numRequired': requiredCourses,
+            },
+            'children': []
+        })
+
+    return coreqs
+
+def findCourseDependencies(courseCache, newCourses, dept: str, courseNum: str, extraAttribs: dict = {}):
     # if already cached, don't repeat the computation
     courseKey = (f'{dept}-{courseNum}').upper()
     if courseKey in courseCache: return courseCache[courseKey]
@@ -100,13 +141,18 @@ def findCourseDependencies(courseCache, newCourses, dept: str, courseNum: str):
     try:
         # the default format
         courseInfo = {
-            'rkey': rCourseKey,
             'key': courseKey,
-            'department': dept.upper(),
-            'courseNum': courseNum,
-            'status': 'OFFERED',
-            'prereqs': [],
-            'coreqs': []
+            'name': f'{dept} {courseNum}',
+            'attributes': {
+                # 'type': 'prereq/coreq',
+                # 'group': prereq_group_num
+                # 'numRequired': prereq_num_required
+                'department': dept.upper(),
+                'courseNum': courseNum,
+                'status': 'OFFERED',
+                **extraAttribs
+            },
+            'children': [],
         }
 
         # scrape for course info
@@ -119,7 +165,7 @@ def findCourseDependencies(courseCache, newCourses, dept: str, courseNum: str):
 
         # check if course is offered
         if checkCourseNotOffered(content_container):
-            courseInfo['status'] = 'NOT_OFFERED'
+            courseInfo['attributes']['status'] = 'NOT_OFFERED'
             print(f'DEBUG (scrape_course): {dept} {courseNum} not offered')
             
             # save into cache and new data for redis
@@ -132,27 +178,23 @@ def findCourseDependencies(courseCache, newCourses, dept: str, courseNum: str):
         raise
 
     try:
-
         # get prereq containers and coreq containers, if any
         prereqContainer = content_container.find_all(filterPrereqContainer)
         coreqContainer = content_container.find_all(filterCoreqContainer)
 
         # get list of prereqs and coreqs
-        prereqs = [] if not len(prereqContainer) else getCoursePrereqs(courseKey, prereqContainer[0]) 
+        prereqs = [] if not len(prereqContainer) else getCoursePrereqs(prereqContainer[0]) 
         coreqs = [] if not len(coreqContainer) else getCourseCoreqs(coreqContainer[0]) 
 
         # recurse here for prereqs
         if len(prereqs):
             for idx, p in enumerate(prereqs):
-                pr = p['prereq'].split('-')
-                prInfo = findCourseDependencies(courseCache, newCourses, pr[0], pr[1])
-                prereqs[idx]['prereqInfo'] = prInfo
+                prInfo = findCourseDependencies(courseCache, newCourses, p['dept'], p['courseNum'], p['extraAttribs'])
+                prereqs[idx] = prInfo
         else:
             print(f'DEBUG (scrape_course): no prereqs found for {dept} {courseNum}')
-        courseInfo['prereqs'] = prereqs
-
         # don't need to recurse for coreqs
-        courseInfo['coreqs'] = coreqs
+        courseInfo['children'] = [*prereqs, *coreqs]
 
     except Exception as e:
         traceback.print_exc()
