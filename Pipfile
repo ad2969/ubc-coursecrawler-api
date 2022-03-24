@@ -13,6 +13,8 @@ django = "*"
 django-cors-headers = "*"
 redis = "*"
 install = "*"
+gunicorn = "*"
+django-heroku = "*"
 
 [dev-packages]
 pylint = "*"
