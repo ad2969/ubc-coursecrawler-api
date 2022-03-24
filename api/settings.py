@@ -28,7 +28,10 @@ SECRET_KEY = 'django-insecure-ti9c^1v_vc^0-kw35z!!-0a=_n6=fe8#q(5h%0*z!6b&n*n!(b
 # DEBUG = True
 DEBUG = False
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+  'http://localhost:3000',
+  'https://ubc-coursecrawler.netlify.app'
+]
 
 # Redis Database
 REDIS_HOST = 'redis-12422.c241.us-east-1-4.ec2.cloud.redislabs.com'
@@ -59,11 +62,11 @@ MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
 ]
 
-CORS_ORIGIN_ALLOW_ALL = True
-# CORS_ORIGIN_WHITELIST = (
-#   'http://localhost:3000',
-#   'ubc-coursecrawler.netlify.app'
-# )
+# CORS_ORIGIN_ALLOW_ALL = True
+CORS_ORIGIN_WHITELIST = (
+  'http://localhost:3000',
+  'https://ubc-coursecrawler.netlify.app'
+)
 ROOT_URLCONF = 'api.urls'
 
 TEMPLATES = [
