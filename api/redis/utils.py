@@ -83,9 +83,10 @@ def setOne(prefix: str, key: str, body: str):
             f'problem with setting {prefix}:{key} to redis -- {str(e)}'
         )
 
-def deleteAll(prefix: str):
+def deleteAll(prefix: str, override = False):
     try:
-        keys = redis_instance.keys(f'{prefix}:*')
+        key = prefix if override else f'{prefix}:*'
+        keys = redis_instance.keys(key)
         count = len(keys)
         if count: redis_instance.delete(*keys)
         

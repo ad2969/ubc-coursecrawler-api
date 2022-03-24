@@ -6,7 +6,7 @@ class Course(models.Model):
     key = models.CharField(max_length=10)
     department = models.ForeignKey(Department, blank=False, on_delete=models.CASCADE)
     courseNum = models.IntegerField(blank=False)
-    coreqs = models.ManyToManyField('self', symmetrical=True, null=True, blank=True)
+    coreqs = models.ManyToManyField('self', symmetrical=True, blank=True)
     
     def __str__(self):
         return self.key

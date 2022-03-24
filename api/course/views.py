@@ -45,7 +45,7 @@ class CourseListView(APIView):
                 }, status = status.HTTP_400_BAD_REQUEST)
             else:
                 response = deleteAll(COURSE_PREFIX)
-                deleteAll(COURSE_HIT_COUNTER_SET)
+                deleteAll(COURSE_HIT_COUNTER_SET, True)
 
                 return Response(response, status=response['code'])
 
