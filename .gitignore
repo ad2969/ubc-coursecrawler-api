@@ -28,6 +28,7 @@ yarn-error.log*
 # Databases
 *.bak
 *.sqlite3
+**/__pycache__
 
 # security local files
 _*.sh

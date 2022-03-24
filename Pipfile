@@ -12,6 +12,7 @@ djangorestframework = "*"
 django = "*"
 django-cors-headers = "*"
 redis = "*"
+install = "*"
 
 [dev-packages]
 pylint = "*"
