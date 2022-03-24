@@ -1,4 +1,3 @@
-import redis
 from rest_framework import status
 from api.utils.response import ResponseError
 

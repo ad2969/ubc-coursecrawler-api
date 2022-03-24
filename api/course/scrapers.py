@@ -163,16 +163,20 @@ def findCourseDependencies(courseCache, newCourses, dept: str, courseNum: str):
         newCourses[rCourseKey] = json.dumps(courseInfo)
         return courseInfo
 
-def scrapeCourseInformation(dept: str, courseNum: str):
+def scrapeCourseInformation(courseKey: str):
     courseCache = {}
     newCourses = {}
     mainCourseInfo = {}
+
+    courseKeySplit = courseKey.split('-')
+    dept = courseKeySplit[0]
+    courseNum = courseKeySplit[1]
 
     try:
         # do this initially to test connection
         driver.get(generateUrl('COURSES', dept, courseNum))
         # start finding dependencies
-        mainCourseInfo = findCourseDependencies(courseCache, newCourses, dept.upper(), courseNum)
+        mainCourseInfo = findCourseDependencies(courseCache, newCourses, dept, courseNum)
 
     except PageError as e:
         print('ERROR ->>> cannot find page layout. {}'.format(e))

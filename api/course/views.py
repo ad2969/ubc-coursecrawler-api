@@ -4,8 +4,9 @@ from rest_framework.response import Response
 from rest_framework import status
 from api.utils.exceptions import PageError
 from api.utils.response import ResponseThen, ResponseError
-from api.redis.prefixes import COURSE_PREFIX
+from api.redis.prefixes import COURSE_HIT_COUNTER_SET, COURSE_PREFIX
 from api.redis.utils import getAll, getOne, setMultiple, deleteAll
+from api.redis.social import logCourse, getPopularCourses
 from .scrapers import scrapeCourseInformation
 
 class CourseListView(APIView):
@@ -44,6 +45,7 @@ class CourseListView(APIView):
                 }, status = status.HTTP_400_BAD_REQUEST)
             else:
                 response = deleteAll(COURSE_PREFIX)
+                deleteAll(COURSE_HIT_COUNTER_SET)
 
                 return Response(response, status=response['code'])
 
@@ -61,23 +63,23 @@ class CourseListView(APIView):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class CourseDetailView(APIView):
-    def get(self, request, id=None):
+    def get(self, request, id):
         forceScrapeParam = request.query_params.get('forceScrape') # to force a scrape
         preventSaveParam = request.query_params.get('preventSave') # to prevent saving scraped data
 
+        courseKey = id.upper()
+
         try:
-            courseKey = id.split('-')
-            
             # if exists in the database
             if not forceScrapeParam:
-                existingCourse = getOne(COURSE_PREFIX, id.upper())
+                existingCourse = getOne(COURSE_PREFIX, courseKey)
 
                 # if exists in redis
                 if existingCourse['data']:
                     return Response(existingCourse, status=existingCourse['code'])
 
             # scrape course information
-            data, newData = scrapeCourseInformation(courseKey[0],courseKey[1])
+            data, newData = scrapeCourseInformation(courseKey)
 
             if preventSaveParam: # do not save scrape result
                 return Response({
@@ -99,6 +101,27 @@ class CourseDetailView(APIView):
                 'status': 'INTERNAL ERROR',
                 'msg': e.message,
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        except ResponseError as e:
+            return Response({
+                'status': e.status,
+                'data': e.message,
+            }, status=e.statusCode)
+
+        except Exception as e:
+            return Response({
+                'status': 'INTERNAL ERROR',
+                'data': e,
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        finally:
+            # log that this course has been queried once
+            logCourse(courseKey)
+class PopularCourseListView(APIView):
+    def get(self, request):
+        try:
+            response = getPopularCourses(10)
+            return Response(response, status=response['code'])
 
         except ResponseError as e:
             return Response({
