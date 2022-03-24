@@ -53,8 +53,6 @@ def getOne(prefix: str, key: str):
 def setMultiple(prefix: str, data: dict):
     try:
         count = len(data)
-        print("YAYEET")
-        print(data)
         redis_instance.mset(data)
 
         return {

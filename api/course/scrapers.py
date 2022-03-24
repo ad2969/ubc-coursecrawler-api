@@ -131,8 +131,9 @@ def findCourseDependencies(courseCache, newCourses, dept: str, courseNum: str, e
         existing = getOne(COURSE_PREFIX, courseKey)
         if existing['data']:
             # save in cache
-            courseCache[courseKey] = existing['data']
-            return existing['data']
+            data = json.loads(existing['data'])
+            courseCache[courseKey] = data
+            return data
 
     except Exception as e:  # exception here means something happened with redis
         traceback.print_exc()
@@ -201,6 +202,7 @@ def findCourseDependencies(courseCache, newCourses, dept: str, courseNum: str, e
         raise
     finally:
         # save the course
+        print(courseInfo)
         courseCache[courseKey] = courseInfo
         newCourses[rCourseKey] = json.dumps(courseInfo)
         return courseInfo
