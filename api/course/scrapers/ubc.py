@@ -9,10 +9,11 @@ import traceback
 from bs4 import BeautifulSoup
 
 from api.redis.utils import getOne
-from api.redis.prefixes import COURSE_PREFIX
+from api.redis.constants.datatypes import COURSE_DATA_TYPE
+
 from api.utils.exceptions import PageError
-from ..utils.selenium import driver
-from ..utils.url import generateUrl
+from api.selenium import driver
+from api.utils.url import generateUrl
 
 RE_STRING_PREREQ = re.compile('^(?:Pre-reqs).*$')
 RE_STRING_COREQ = re.compile('^(Co-req).*$')
@@ -124,11 +125,11 @@ def findCourseDependencies(courseCache, newCourses, dept: str, courseNum: str, e
     # if already cached, don't repeat the computation
     courseKey = (f'{dept}-{courseNum}').upper()
     if courseKey in courseCache: return courseCache[courseKey]
-    rCourseKey = f'{COURSE_PREFIX}:{courseKey}'
+    rCourseKey = f'{COURSE_DATA_TYPE}:{courseKey}'
 
     try:
         # otherwise, search for it in redis
-        existing = getOne(COURSE_PREFIX, courseKey)
+        existing = getOne('UBC', COURSE_DATA_TYPE, courseKey)
         if existing['data']:
             # save in cache
             data = json.loads(existing['data'])
@@ -202,7 +203,6 @@ def findCourseDependencies(courseCache, newCourses, dept: str, courseNum: str, e
         raise
     finally:
         # save the course
-        print(courseInfo)
         courseCache[courseKey] = courseInfo
         newCourses[rCourseKey] = json.dumps(courseInfo)
         return courseInfo

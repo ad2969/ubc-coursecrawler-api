@@ -1,136 +1,82 @@
-import traceback
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from api.utils.exceptions import PageError
-from api.utils.response import ResponseThen, ResponseError
-from api.redis.prefixes import COURSE_HIT_COUNTER_SET, COURSE_PREFIX
-from api.redis.utils import getAll, getOne, setMultiple, deleteAll
+
+from api.redis.constants.datatypes import COURSE_SEARCH_COUNTER_DATA_TYPE, COURSE_DATA_TYPE
 from api.redis.social import logCourse, getPopularCourses
-from .scrapers import scrapeCourseInformation
+from api.redis.utils import getAll, getOne, setMultiple, deleteAll
+from .scrapers import courseScrapers
+
+from api.utils.exceptions import apiExceptionHandler
+from api.utils.response import ResponseThen
 
 class CourseListView(APIView):
-    def get(self, request):
-        try:
-            response = getAll(COURSE_PREFIX)
-            return Response(response, status=response['code'])
-
-        except ResponseError as e:
-            return Response({
-                'status': e.status,
-                'data': e.message,
-            }, status=e.statusCode)
-
-        except Exception as e:
-            return Response({
-                'status': 'INTERNAL ERROR',
-                'data': e,
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    @apiExceptionHandler
+    def get(self, request, institution):
+        response = getAll(institution, COURSE_DATA_TYPE)
+        return Response(response, status=response['code'])
 
     # admin use, requires secret
-    def post(self, request):
+    @apiExceptionHandler
+    def post(self, request, institution):
         if 'secret' not in request.data or 'method' not in request.data:
             return Response({
                 'status': 'REQUEST ERROR',
                 'msg': 'no method or secret'
             }, status = status.HTTP_400_BAD_REQUEST)
 
-        try:
-            method = request.data['method']
+        method = request.data['method']
 
-            if method != 'CLEAN':
-                return Response({
-                    'status': 'REQUEST ERROR',
-                    'msg': 'invalid method'
-                }, status = status.HTTP_400_BAD_REQUEST)
-            else:
-                response = deleteAll(COURSE_PREFIX)
-                deleteAll(COURSE_HIT_COUNTER_SET, True)
-
-                return Response(response, status=response['code'])
-
-        except ResponseError as e:
+        if method != 'CLEAN':
             return Response({
-                'status': e.status,
-                'msg': e.message,
-            }, status=e.statusCode)
+                'status': 'REQUEST ERROR',
+                'msg': 'invalid method'
+            }, status = status.HTTP_400_BAD_REQUEST)
+        else:
+            response = deleteAll(institution, COURSE_DATA_TYPE)
+            deleteAll(institution, COURSE_SEARCH_COUNTER_DATA_TYPE, override=True)
 
-        except Exception as e:
-            traceback.print_exc()
-            return Response({
-                'status': 'INTERNAL ERROR',
-                'msg': e,
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response(response, status=response['code'])
 
 class CourseDetailView(APIView):
-    def get(self, request, id):
+    @apiExceptionHandler
+    def get(self, request, institution, id):
         forceScrapeParam = request.query_params.get('forceScrape') # to force a scrape
         preventSaveParam = request.query_params.get('preventSave') # to prevent saving scraped data
 
         courseKey = id.upper()
 
-        try:
-            # if exists in the database
-            if not forceScrapeParam:
-                existingCourse = getOne(COURSE_PREFIX, courseKey)
+        # if exists in the database
+        if not forceScrapeParam:
+            existingCourse = getOne(institution, COURSE_DATA_TYPE, courseKey)
 
-                # if exists in redis
-                if existingCourse['data']:
-                    return Response(existingCourse, status=existingCourse['code'])
+            # if exists in redis
+            if existingCourse['data']:
+                return Response(existingCourse, status=existingCourse['code'])
 
-            # scrape course information
-            data, newData = scrapeCourseInformation(courseKey)
+        # scrape course information
+        data, newData = courseScrapers['UBC'](courseKey)
 
-            if preventSaveParam: # do not save scrape result
-                return Response({
-                    'status': 'SUCCESS',
-                    'data': data,
-                    'msg': 'scraped, data will not be saved',
-                }, status=status.HTTP_200_OK)
-            
-             # save scrape result
-            def tempCallback(): setMultiple(COURSE_PREFIX, newData)
-            return ResponseThen({
-                'status': 'SCRAPE SUCCESS',
+        if preventSaveParam: # do not save scrape result
+            return Response({
+                'status': 'SUCCESS',
                 'data': data,
-                'msg': f'scraped, {len(newData)} new data will be saved',
-            }, tempCallback, status=status.HTTP_201_CREATED)
-
-        except PageError as e:
-            return Response({
-                'status': 'INTERNAL ERROR',
-                'msg': e.message,
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-        except ResponseError as e:
-            return Response({
-                'status': e.status,
-                'data': e.message,
-            }, status=e.statusCode)
-
-        except Exception as e:
-            return Response({
-                'status': 'INTERNAL ERROR',
-                'data': e,
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                'msg': 'scraped, data will not be saved',
+            }, status=status.HTTP_200_OK)
         
-        finally:
+        def tempCallback():
+            # save scrape result
+            setMultiple(institution, COURSE_DATA_TYPE, newData)
             # log that this course has been queried once
-            logCourse(courseKey)
+            logCourse(institution, courseKey)
+
+        return ResponseThen({
+            'status': 'SCRAPE SUCCESS',
+            'data': data,
+            'msg': f'scraped, {len(newData)} new data will be saved',
+        }, tempCallback, status=status.HTTP_201_CREATED)
 class PopularCourseListView(APIView):
-    def get(self, request):
-        try:
-            response = getPopularCourses(10)
-            return Response(response, status=response['code'])
-
-        except ResponseError as e:
-            return Response({
-                'status': e.status,
-                'data': e.message,
-            }, status=e.statusCode)
-
-        except Exception as e:
-            return Response({
-                'status': 'INTERNAL ERROR',
-                'data': e,
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    @apiExceptionHandler
+    def get(self, request, institution):
+        response = getPopularCourses(institution, 10)
+        return Response(response, status=response['code'])

@@ -3,9 +3,12 @@ from api.utils.response import ResponseError
 
 from .db import redis_instance
 
-def getAll(prefix: str):
+def getAll(institution: str, dataType: str = None):
     try:
-        keys = redis_instance.scan_iter(match=f'{prefix}:*')
+        queryString = institution
+        if dataType != None: queryString += f':{dataType}'
+
+        keys = redis_instance.scan_iter(match=f'{queryString}:*')
         items = redis_instance.mget(*keys)
         count = len(items)
         
@@ -21,25 +24,26 @@ def getAll(prefix: str):
         raise ResponseError(
             status.HTTP_500_INTERNAL_SERVER_ERROR,
             'REDUS ERROR: GET',
-            f'problem with getting {prefix} from redis -- {str(e)}'
+            f'problem with getting {dataType} from redis -- {str(e)}'
         )
 
-def getOne(prefix: str, key: str):
+def getOne(institution: str, dataType: str, key: str):
     try:
-        value = redis_instance.get(f'{prefix}:{key}')
+        queryString = f'{institution}:{dataType}:{key}'
+        value = redis_instance.get(queryString)
 
         if not value:
             return {
                 'status': 'SUCCESS',
                 'code': status.HTTP_204_NO_CONTENT,
-                'msg': f'key {prefix}:{key} not found',
+                'msg': f'key {queryString} not found',
                 'data': None,
             }
 
         return {
             'status': 'SUCCESS',
             'code': status.HTTP_200_OK,
-            'msg': f'key {prefix}:{key} found',
+            'msg': f'key {queryString} found',
             'data': value,
         }
 
@@ -47,11 +51,12 @@ def getOne(prefix: str, key: str):
         raise ResponseError(
             status.HTTP_500_INTERNAL_SERVER_ERROR,
             'REDUS ERROR: GET',
-            f'problem with getting {prefix}{key} from redis -- {str(e)}'
+            f'problem with getting {queryString} from redis -- {str(e)}'
         )
 
-def setMultiple(prefix: str, data: dict):
+def setMultiple(institution: str, dataType: str, data: dict):
     try:
+        queryString = f'{institution}:{dataType}'
         count = len(data)
         redis_instance.mset(data)
 
@@ -67,23 +72,25 @@ def setMultiple(prefix: str, data: dict):
         raise ResponseError(
             status.HTTP_500_INTERNAL_SERVER_ERROR,
             'REDIS ERROR: SET',
-            f'problem with setting multiple {prefix} to redis -- {str(e)}'
+            f'problem with setting multiple {queryString} to redis -- {str(e)}'
         )
 
-def setOne(prefix: str, key: str, body: str):
+def setOne(institution: str, dataType: str, key: str, body: str):
     try:
+        queryString = f'{institution}:{dataType}:{key}'
         redis_instance.set(key, body)
     
     except Exception as e:
         raise ResponseError(
             status.HTTP_500_INTERNAL_SERVER_ERROR,
             'REDIS ERROR: SET',
-            f'problem with setting {prefix}:{key} to redis -- {str(e)}'
+            f'problem with setting {queryString} to redis -- {str(e)}'
         )
 
-def deleteAll(prefix: str, override = False):
+def deleteAll(institution: str, dataType: str, override = False):
     try:
-        key = prefix if override else f'{prefix}:*'
+        queryString = f'{institution}:{dataType}'
+        key = queryString if override else f'{queryString}:*'
         keys = redis_instance.keys(key)
         count = len(keys)
         if count: redis_instance.delete(*keys)
@@ -100,5 +107,5 @@ def deleteAll(prefix: str, override = False):
         raise ResponseError(
             status.HTTP_500_INTERNAL_SERVER_ERROR,
             'REDUS ERROR: DELETE',
-            f'problem with deleting all {prefix} from redis -- {str(e)}'
+            f'problem with deleting all {queryString} from redis -- {str(e)}'
         )

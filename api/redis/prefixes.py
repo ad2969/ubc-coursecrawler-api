@@ -1,3 +1,0 @@
-DEPARTMENT_PREFIX = 'dept'
-COURSE_PREFIX = 'course'
-COURSE_HIT_COUNTER_SET = 'coursecount'

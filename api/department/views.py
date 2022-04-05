@@ -4,95 +4,58 @@ import traceback
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
+
+from api.utils.exceptions import apiExceptionHandler
 from api.utils.response import ResponseError
 from api.redis.utils import getAll, getOne, setMultiple, deleteAll
-from api.redis.prefixes import DEPARTMENT_PREFIX
-from .scrapers import scrapeDepartmentInformation
+from api.redis.constants.datatypes import DEPARTMENT_DATA_TYPE
+from .scrapers import departmentScrapers
 
 class DepartmentListView(APIView):
-    def get(self, request):
-        try:
-            response = getAll(DEPARTMENT_PREFIX)
-            return Response(response, status=response['code'])
-
-        except ResponseError as e:
-            return Response({
-                'status': e.status,
-                'msg': e.message,
-            }, status=e.statusCode)
-
-        except Exception as e:
-            traceback.print_exc()
-            return Response({
-                'status': 'internal error',
-                'msg': e,
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    @apiExceptionHandler
+    def get(self, request, institution):
+        response = getAll(institution, DEPARTMENT_DATA_TYPE)
+        return Response(response, status=response['code'])
 
     # admin use, requires secret
-    def post(self, request):
+    @apiExceptionHandler
+    def post(self, request, institution):
         if 'secret' not in request.data or 'method' not in request.data:
             return Response({
                 'status': 'REQUEST ERROR',
                 'msg': 'no method or secret'
             }, status = status.HTTP_400_BAD_REQUEST)
 
-        try:
-            method = request.data['method']
+        method = request.data['method']
 
-            if method != 'SCRAPE' and method != 'CLEAN':
-                return Response({
-                    'status': 'REQUEST ERROR',
-                    'msg': 'invalid method'
-                }, status = status.HTTP_400_BAD_REQUEST)
-
-            if request.data['secret'] != os.getenv('API_SECRET'):
-                return Response({
-                    'status': 'REQUEST ERROR',
-                    'msg': 'invalid secret'
-                }, status = status.HTTP_400_BAD_REQUEST)
-
-            if method == 'SCRAPE':
-                departments = scrapeDepartmentInformation()
-                response = setMultiple(DEPARTMENT_PREFIX, {
-                    val['rkey'] : json.dumps(val)
-                    for val in departments
-                })
-
-                return Response(response, status=response['code'])
-
-            elif method == 'CLEAN':
-                response = deleteAll(DEPARTMENT_PREFIX)
-
-                return Response(response, status=response['code'])
-
-        except ResponseError as e:
+        if method != 'SCRAPE' and method != 'CLEAN':
             return Response({
-                'status': e.status,
-                'msg': e.message,
-            }, status=e.statusCode)
+                'status': 'REQUEST ERROR',
+                'msg': 'invalid method'
+            }, status = status.HTTP_400_BAD_REQUEST)
 
-        except Exception as e:
-            traceback.print_exc()
+        if request.data['secret'] != os.getenv('API_SECRET'):
             return Response({
-                'status': 'internal error',
-                'msg': e,
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                'status': 'REQUEST ERROR',
+                'msg': 'invalid secret'
+            }, status = status.HTTP_400_BAD_REQUEST)
 
-class DepartmentDetailView(APIView):
-    def get(self, request, id=None):
-        try:
-            response = getOne(DEPARTMENT_PREFIX, id.upper())
+        if method == 'SCRAPE':
+            departments = departmentScrapers['UBC']()
+            response = setMultiple(institution, DEPARTMENT_DATA_TYPE, {
+                val['rkey'] : json.dumps(val)
+                for val in departments
+            })
+
             return Response(response, status=response['code'])
 
-        except ResponseError as e:
-            return Response({
-                'status': e.status,
-                'msg': e.message,
-            }, status=e.statusCode)
+        elif method == 'CLEAN':
+            response = deleteAll(institution, DEPARTMENT_DATA_TYPE)
 
-        except Exception as e:
-            traceback.print_exc()
-            return Response({
-                'status': 'internal error',
-                'msg': e,
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response(response, status=response['code'])
+
+class DepartmentDetailView(APIView):
+    @apiExceptionHandler
+    def get(self, request, institution, id=None):
+        response = getOne(institution, DEPARTMENT_DATA_TYPE, id.upper())
+        return Response(response, status=response['code'])

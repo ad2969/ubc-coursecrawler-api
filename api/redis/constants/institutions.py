@@ -1,0 +1,3 @@
+INSTITUTION_CODES = [
+    'UBC'
+]

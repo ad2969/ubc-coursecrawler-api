@@ -2,9 +2,9 @@ from rest_framework import status
 from api.utils.response import ResponseError
 
 from .db import redis_instance
-from .prefixes import COURSE_HIT_COUNTER_SET
+from .constants.datatypes import COURSE_SEARCH_COUNTER_DATA_TYPE
 
-def logCourse(courseKey: str):
+def logCourse(institution: str, courseKey: str):
     try:
         # 'ZADD' arguments
         # name Union[bytes, str, memoryview]
@@ -14,19 +14,21 @@ def logCourse(courseKey: str):
         # ch modifies the return value to be the numbers of elements changed. Changed elements include new elements that were added and elements whose scores changed.
         # incr modifies ZADD to behave like ZINCRBY. In this mode only a single element/score pair can be specified and the score is the amount the existing score will be incremented by. When using this mode the return value of ZADD will be the new score of the element.
         # https://redis-py.readthedocs.io/en/stable/commands.html?highlight=zincr#redis.commands.core.CoreCommands.zadd
-        redis_instance.zadd(COURSE_HIT_COUNTER_SET, {courseKey: 1}, False, False, False, True)
+        queryString = f'{institution}:{COURSE_SEARCH_COUNTER_DATA_TYPE}'
+        redis_instance.zadd(queryString, {courseKey: 1}, False, False, False, True)
         return True
 
     except Exception as e:
         raise ResponseError(
             status.HTTP_500_INTERNAL_SERVER_ERROR,
-            'REDUS ERROR: INCR',
+            'REDIS ERROR: INCR',
             f'problem with updating counter for {courseKey} to redis -- {str(e)}'
         )
 
-def getPopularCourses(num: int = 10):
+def getPopularCourses(institution: str, num: int = 10):
     try:
-        sortedCourses = redis_instance.zrange(COURSE_HIT_COUNTER_SET, -1-num, -1, True, True)
+        queryString = f'{institution}:{COURSE_SEARCH_COUNTER_DATA_TYPE}'
+        sortedCourses = redis_instance.zrange(queryString, -1-num, -1, True, True)
         count = len(sortedCourses)
         
         return {
@@ -40,6 +42,6 @@ def getPopularCourses(num: int = 10):
     except Exception as e:
         raise ResponseError(
             status.HTTP_500_INTERNAL_SERVER_ERROR,
-            'REDUS ERROR: GET',
+            'REDIS ERROR: GET',
             f'problem with getting popular courses from redis -- {str(e)}'
         )
