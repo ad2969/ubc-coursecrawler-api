@@ -28,6 +28,7 @@ SECRET_KEY = "django-insecure-ti9c^1v_vc^0-kw35z!!-0a=_n6=fe8#q(5h%0*z!6b&n*n!(b
 # DEBUG = True
 DEBUG = False
 
+# ALLOWED_HOSTS = ["*"]
 ALLOWED_HOSTS = [
   "http://localhost:3000",
   "https://ubc-coursecrawler.netlify.app"

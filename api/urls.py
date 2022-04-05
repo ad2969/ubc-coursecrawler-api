@@ -20,6 +20,7 @@ from api.views import *
 
 urlpatterns = [
     path("admin/", admin.site.urls),
+    path("test/", TestView.as_view()),
     # COURSE LINKS
     path("api/courses/<str:institution>", CourseListView.as_view()),
     path("api/courses/<str:institution>/popular", PopularCourseListView.as_view()),
