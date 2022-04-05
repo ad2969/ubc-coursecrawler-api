@@ -15,30 +15,30 @@ from api.selenium import driver
 from api.utils.exceptions import PageError
 from api.utils.url import generateUbcUrl
 
-RE_STRING_PREREQ = re.compile('^(?:Pre-reqs).*$')
-RE_STRING_COREQ = re.compile('^(Co-req).*$')
-RE_STRING_NOOFFER = re.compile('no longer offered')
+RE_STRING_PREREQ = re.compile("^(?:Pre-reqs).*$")
+RE_STRING_COREQ = re.compile("^(Co-req).*$")
+RE_STRING_NOOFFER = re.compile("no longer offered")
 
 RE_STRING_REQUIRED_COURSES = [
-    [0, re.compile('(?:All of|all of)')],
-    [1, re.compile('(?:One of|one of)')],
-    [2, re.compile('(?:Two of|two of)')],
-    [3, re.compile('(?:Three of|three of)')],
-    [4, re.compile('(?:Four of|four of)')],
-    [5, re.compile('(?:Five of|five of)')],
+    [0, re.compile("(?:All of|all of)")],
+    [1, re.compile("(?:One of|one of)")],
+    [2, re.compile("(?:Two of|two of)")],
+    [3, re.compile("(?:Three of|three of)")],
+    [4, re.compile("(?:Four of|four of)")],
+    [5, re.compile("(?:Five of|five of)")],
 ]
 
 def filterPrereqContainer(tag):
-    return tag.name == 'p' and len(tag.contents) and RE_STRING_PREREQ.match(tag.contents[0].get_text())
+    return tag.name == "p" and len(tag.contents) and RE_STRING_PREREQ.match(tag.contents[0].get_text())
 
 def filterCoreqContainer(tag):
-    return tag.name == 'p' and len(tag.contents) and RE_STRING_COREQ.match(tag.contents[0].get_text())
+    return tag.name == "p" and len(tag.contents) and RE_STRING_COREQ.match(tag.contents[0].get_text())
 
 def checkCourseNotOffered(container):
     try:
         return any(RE_STRING_NOOFFER.search(content.get_text()) for content in container.contents)
     except:
-        print('ERROR ->>> page layout unrecognized')
+        print("ERROR ->>> page layout unrecognized")
         raise
 
 def checkNumberOfCoursesRequired(line):
@@ -66,17 +66,17 @@ def getCoursePrereqs(container):
             continue
 
         # if its not a link or no indicator yet (weird use case)
-        if prereqGroupCounter == -1 or currLine.name != 'a': continue
+        if prereqGroupCounter == -1 or currLine.name != "a": continue
         # add as a prereq
         name = currLine.get_text().strip().upper()
-        splitted = name.split(' ')
+        splitted = name.split(" ")
         prereqs.append({
-            'dept': splitted[0],
-            'courseNum': splitted[1],
-            'extraAttribs': {
-                'type': 'prereq',
-                'group': prereqGroupCounter,
-                'numRequired': requiredCourses,
+            "dept": splitted[0],
+            "courseNum": splitted[1],
+            "extraAttribs": {
+                "type": "prereq",
+                "group": prereqGroupCounter,
+                "numRequired": requiredCourses,
             }
         })
 
@@ -102,37 +102,37 @@ def getCourseCoreqs(container):
             continue
 
         # if its not a link or no indicator yet (weird use case)
-        if coreqGroupCounter == -1 or currLine.name != 'a': continue
+        if coreqGroupCounter == -1 or currLine.name != "a": continue
         # add as a prereq
         name = currLine.get_text().strip().upper()
-        splitted = name.split(' ')
+        splitted = name.split(" ")
         coreqs.append({
-            'key': name.replace(' ', '-'),
-            'name': name,
-            'attributes': {
-                'type': 'coreq',
-                'department': splitted[0],
-                'courseNum': splitted[1],
-                'group': coreqGroupCounter,
-                'numRequired': requiredCourses,
+            "key": name.replace(" ", "-"),
+            "name": name,
+            "attributes": {
+                "type": "coreq",
+                "department": splitted[0],
+                "courseNum": splitted[1],
+                "group": coreqGroupCounter,
+                "numRequired": requiredCourses,
             },
-            'children': []
+            "children": []
         })
 
     return coreqs
 
 def findCourseDependencies(courseCache, newCourses, dept: str, courseNum: str, extraAttribs: dict = {}):
-    # if already cached, don't repeat the computation
-    courseKey = (f'{dept}-{courseNum}').upper()
+    # if already cached, don"t repeat the computation
+    courseKey = (f"{dept}-{courseNum}").upper()
     if courseKey in courseCache: return courseCache[courseKey]
-    rCourseKey = f'{COURSE_DATA_TYPE}:{courseKey}'
+    rCourseKey = f"{COURSE_DATA_TYPE}:{courseKey}"
 
     try:
         # otherwise, search for it in redis
-        existing = getOne('UBC', COURSE_DATA_TYPE, courseKey)
-        if existing['data']:
+        existing = getOne("UBC", COURSE_DATA_TYPE, courseKey)
+        if existing["data"]:
             # save in cache
-            data = json.loads(existing['data'])
+            data = json.loads(existing["data"])
             courseCache[courseKey] = data
             return data
 
@@ -143,32 +143,32 @@ def findCourseDependencies(courseCache, newCourses, dept: str, courseNum: str, e
     try:
         # the default format
         courseInfo = {
-            'key': courseKey,
-            'name': f'{dept} {courseNum}',
-            'attributes': {
-                # 'type': 'prereq/coreq',
-                # 'group': prereq_group_num
-                # 'numRequired': prereq_num_required
-                'department': dept.upper(),
-                'courseNum': courseNum,
-                'status': 'OFFERED',
+            "key": courseKey,
+            "name": f"{dept} {courseNum}",
+            "attributes": {
+                # "type": "prereq/coreq",
+                # "group": prereq_group_num
+                # "numRequired": prereq_num_required
+                "department": dept.upper(),
+                "courseNum": courseNum,
+                "status": "OFFERED",
                 **extraAttribs
             },
-            'children': [],
+            "children": [],
         }
 
         # scrape for course info
-        driver.get(generateUbcUrl('COURSES', dept, courseNum))
-        soup = BeautifulSoup(driver.page_source, 'html.parser')
-        content_container = soup.find('div', class_=re.compile('content expand'))
+        driver.get(generateUbcUrl("COURSES", dept, courseNum))
+        soup = BeautifulSoup(driver.page_source, "html.parser")
+        content_container = soup.find("div", class_=re.compile("content expand"))
 
         if not content_container: # means something is wrong with the page
-            raise PageError('Page layout unrecognized')
+            raise PageError("Page layout unrecognized")
 
         # check if course is offered
         if checkCourseNotOffered(content_container):
-            courseInfo['attributes']['status'] = 'NOT_OFFERED'
-            print(f'DEBUG (scrape_course): {dept} {courseNum} not offered')
+            courseInfo["attributes"]["status"] = "NOT_OFFERED"
+            print(f"DEBUG (scrape_course): {dept} {courseNum} not offered")
             
             # save into cache and new data for redis
             courseCache[courseKey] = courseInfo
@@ -191,12 +191,12 @@ def findCourseDependencies(courseCache, newCourses, dept: str, courseNum: str, e
         # recurse here for prereqs
         if len(prereqs):
             for idx, p in enumerate(prereqs):
-                prInfo = findCourseDependencies(courseCache, newCourses, p['dept'], p['courseNum'], p['extraAttribs'])
+                prInfo = findCourseDependencies(courseCache, newCourses, p["dept"], p["courseNum"], p["extraAttribs"])
                 prereqs[idx] = prInfo
         else:
-            print(f'DEBUG (scrape_course): no prereqs found for {dept} {courseNum}')
-        # don't need to recurse for coreqs
-        courseInfo['children'] = [*prereqs, *coreqs]
+            print(f"DEBUG (scrape_course): no prereqs found for {dept} {courseNum}")
+        # don"t need to recurse for coreqs
+        courseInfo["children"] = [*prereqs, *coreqs]
 
     except Exception as e:
         traceback.print_exc()
@@ -212,23 +212,23 @@ def scrapeCourseInformation(courseKey: str):
     newCourses = {}
     mainCourseInfo = {}
 
-    courseKeySplit = courseKey.split('-')
+    courseKeySplit = courseKey.split("-")
     dept = courseKeySplit[0]
     courseNum = courseKeySplit[1]
 
     try:
         # do this initially to test connection
-        driver.get(generateUbcUrl('COURSES', dept, courseNum))
+        driver.get(generateUbcUrl("COURSES", dept, courseNum))
         # start finding dependencies
         mainCourseInfo = findCourseDependencies(courseCache, newCourses, dept, courseNum)
 
     except PageError as e:
-        print('ERROR ->>> cannot find page layout. {}'.format(e))
+        print("ERROR ->>> cannot find page layout. {}".format(e))
         traceback.print_exc()
         raise e
 
     except Exception as e:
-        print('ERROR ->>> could not scrape course page. {}'.format(e))
+        print("ERROR ->>> could not scrape course page. {}".format(e))
         traceback.print_exc()
         raise
 

@@ -2,7 +2,7 @@ import os
 import redis
 from django.conf import settings
 
-redis_pw = os.getenv('REDIS_PASS')
+redis_pw = os.getenv("REDIS_PASS")
 
 redis_instance = redis.StrictRedis(
     host=settings.REDIS_HOST,

@@ -14,35 +14,35 @@ class CourseListView(APIView):
     @apiExceptionHandler
     def get(self, request, institution):
         response = getAll(institution, COURSE_DATA_TYPE)
-        return Response(response, status=response['code'])
+        return Response(response, status=response["code"])
 
     # admin use, requires secret
     @apiExceptionHandler
     def post(self, request, institution):
-        if 'secret' not in request.data or 'method' not in request.data:
+        if "secret" not in request.data or "method" not in request.data:
             return Response({
-                'status': 'REQUEST ERROR',
-                'msg': 'no method or secret'
+                "status": "REQUEST ERROR",
+                "msg": "no method or secret"
             }, status = status.HTTP_400_BAD_REQUEST)
 
-        method = request.data['method']
+        method = request.data["method"]
 
-        if method != 'CLEAN':
+        if method != "CLEAN":
             return Response({
-                'status': 'REQUEST ERROR',
-                'msg': 'invalid method'
+                "status": "REQUEST ERROR",
+                "msg": "invalid method"
             }, status = status.HTTP_400_BAD_REQUEST)
         else:
             response = deleteAll(institution, COURSE_DATA_TYPE)
             deleteAll(institution, COURSE_SEARCH_COUNTER_DATA_TYPE, override=True)
 
-            return Response(response, status=response['code'])
+            return Response(response, status=response["code"])
 
 class CourseDetailView(APIView):
     @apiExceptionHandler
     def get(self, request, institution, id):
-        forceScrapeParam = request.query_params.get('forceScrape') # to force a scrape
-        preventSaveParam = request.query_params.get('preventSave') # to prevent saving scraped data
+        forceScrapeParam = request.query_params.get("forceScrape") # to force a scrape
+        preventSaveParam = request.query_params.get("preventSave") # to prevent saving scraped data
 
         courseKey = id.upper()
 
@@ -51,17 +51,17 @@ class CourseDetailView(APIView):
             existingCourse = getOne(institution, COURSE_DATA_TYPE, courseKey)
 
             # if exists in redis
-            if existingCourse['data']:
-                return Response(existingCourse, status=existingCourse['code'])
+            if existingCourse["data"]:
+                return Response(existingCourse, status=existingCourse["code"])
 
         # scrape course information
-        data, newData = courseScrapers['UBC'](courseKey)
+        data, newData = courseScrapers["UBC"](courseKey)
 
         if preventSaveParam: # do not save scrape result
             return Response({
-                'status': 'SUCCESS',
-                'data': data,
-                'msg': 'scraped, data will not be saved',
+                "status": "SUCCESS",
+                "data": data,
+                "msg": "scraped, data will not be saved",
             }, status=status.HTTP_200_OK)
         
         def tempCallback():
@@ -71,12 +71,12 @@ class CourseDetailView(APIView):
             logCourse(institution, courseKey)
 
         return ResponseThen({
-            'status': 'SCRAPE SUCCESS',
-            'data': data,
-            'msg': f'scraped, {len(newData)} new data will be saved',
+            "status": "SCRAPE SUCCESS",
+            "data": data,
+            "msg": f"scraped, {len(newData)} new data will be saved",
         }, tempCallback, status=status.HTTP_201_CREATED)
 class PopularCourseListView(APIView):
     @apiExceptionHandler
     def get(self, request, institution):
         response = getPopularCourses(institution, 10)
-        return Response(response, status=response['code'])
+        return Response(response, status=response["code"])

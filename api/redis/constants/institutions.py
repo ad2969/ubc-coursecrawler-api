@@ -1,3 +1,3 @@
 INSTITUTION_CODES = [
-    'UBC'
+    "UBC"
 ]

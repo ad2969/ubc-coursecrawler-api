@@ -2,5 +2,5 @@
 from .ubc import scrapeCourseInformation as scrapeUbcCourseInformation
 
 courseScrapers = {
-    'UBC': scrapeUbcCourseInformation
+    "UBC": scrapeUbcCourseInformation
 }
