@@ -3,6 +3,8 @@
 # https://courses.students.ubc.ca/cs/courseschedule?pname=subjarea&tname=subj-department&dept=AANB
 # https://courses.students.ubc.ca/cs/courseschedule?pname=subjarea&tname=subj-course&dept=AANB&course=530A
 
+# TODO: If error detected during scraping, don't save into redis
+
 import re
 import json
 import traceback
@@ -13,6 +15,7 @@ from api.redis.utils import getOne
 from api.selenium import driver
 
 from api.utils.exceptions import PageError
+from api.utils.regex import isStringACourse
 from api.utils.url import generateUbcUrl
 
 RE_STRING_PREREQ = re.compile("^(?:Pre-reqs).*$")
@@ -69,6 +72,8 @@ def getCoursePrereqs(container):
         if prereqGroupCounter == -1 or currLine.name != "a": continue
         # add as a prereq
         name = currLine.get_text().strip().upper()
+        if not isStringACourse(name): continue # validation check if string is a course
+
         splitted = name.split(" ")
         prereqs.append({
             "dept": splitted[0],
@@ -105,12 +110,15 @@ def getCourseCoreqs(container):
         if coreqGroupCounter == -1 or currLine.name != "a": continue
         # add as a prereq
         name = currLine.get_text().strip().upper()
+        if not isStringACourse(name): continue # validation check if string is a course
+
         splitted = name.split(" ")
         coreqs.append({
             "key": name.replace(" ", "-"),
             "name": name,
             "attributes": {
                 "type": "coreq",
+                "institution": "UBC",
                 "department": splitted[0],
                 "courseNum": splitted[1],
                 "group": coreqGroupCounter,
@@ -125,32 +133,31 @@ def findCourseDependencies(courseCache, newCourses, dept: str, courseNum: str, e
     # if already cached, don"t repeat the computation
     courseKey = (f"{dept}-{courseNum}").upper()
     if courseKey in courseCache: return courseCache[courseKey]
-    rCourseKey = f"{COURSE_DATA_TYPE}:{courseKey}"
+
+    # rKey is the key used for redis
+    rKey = f"UBC:{COURSE_DATA_TYPE}:{courseKey}"
+    courseInfo = None
+    isCourseInredis = False
 
     try:
-        # otherwise, search for it in redis
+        # first, search for the course in redis
         existing = getOne("UBC", COURSE_DATA_TYPE, courseKey)
-        if existing["data"]:
-            # save in cache
-            data = json.loads(existing["data"])
-            courseCache[courseKey] = data
-            return data
+        if existing["data"]: # return if course found in redis
+            isCourseInredis = True
+            courseInfo = json.loads(existing["data"])
+            return courseInfo
 
-    except Exception as e:  # exception here means something happened with redis
-        traceback.print_exc()
-        raise
-
-    try:
-        # the default format
+        # if the course was not found in redis, we have to scrape its data
         courseInfo = {
             "key": courseKey,
             "name": f"{dept} {courseNum}",
             "attributes": {
                 # "type": "prereq/coreq",
-                # "group": prereq_group_num
-                # "numRequired": prereq_num_required
+                "institution": "UBC",
                 "department": dept.upper(),
                 "courseNum": courseNum,
+                # "group": prereq_group_num
+                # "numRequired": prereq_num_required
                 "status": "OFFERED",
                 **extraAttribs
             },
@@ -165,52 +172,44 @@ def findCourseDependencies(courseCache, newCourses, dept: str, courseNum: str, e
         if not content_container: # means something is wrong with the page
             raise PageError("Page layout unrecognized")
 
-        # check if course is offered
-        if checkCourseNotOffered(content_container):
+        # check if the course is offered, 
+        if checkCourseNotOffered(content_container): # return if course is not offered
             courseInfo["attributes"]["status"] = "NOT_OFFERED"
             print(f"DEBUG (scrape_course): {dept} {courseNum} not offered")
-            
-            # save into cache and new data for redis
-            courseCache[courseKey] = courseInfo
-            newCourses[rCourseKey] = json.dumps(courseInfo)
             return courseInfo
 
-    except Exception as e: # exception here usually means that the page is unrecognizable
-        traceback.print_exc()
-        raise
-
-    try:
-        # get prereq containers and coreq containers, if any
+        # if offered, get prereq containers and coreq containers
         prereqContainer = content_container.find_all(filterPrereqContainer)
         coreqContainer = content_container.find_all(filterCoreqContainer)
 
-        # get list of prereqs and coreqs
+        # get list of prereqs and coreqs, if any
         prereqs = [] if not len(prereqContainer) else getCoursePrereqs(prereqContainer[0]) 
         coreqs = [] if not len(coreqContainer) else getCourseCoreqs(coreqContainer[0]) 
 
-        # recurse here for prereqs
+        # recurse here for each prereq
         if len(prereqs):
             for idx, p in enumerate(prereqs):
                 prInfo = findCourseDependencies(courseCache, newCourses, p["dept"], p["courseNum"], p["extraAttribs"])
                 prereqs[idx] = prInfo
         else:
             print(f"DEBUG (scrape_course): no prereqs found for {dept} {courseNum}")
+
         # don"t need to recurse for coreqs
         courseInfo["children"] = [*prereqs, *coreqs]
 
     except Exception as e:
         traceback.print_exc()
         raise
+
     finally:
-        # save the course
-        courseCache[courseKey] = courseInfo
-        newCourses[rCourseKey] = json.dumps(courseInfo)
+        courseCache[courseKey] = courseInfo # save the course in cache
+        if not isCourseInredis: newCourses[rKey] = json.dumps(courseInfo) # indicate as new if not already in redis
         return courseInfo
 
 def scrapeCourseInformation(courseKey: str):
-    courseCache = {}
-    newCourses = {}
-    mainCourseInfo = {}
+    courseCache = {} # memoization for if recursive scraping sees the same node
+    newCourses = {} # new courses to save into redis
+    mainCourseInfo = {} # the main course being queried
 
     courseKeySplit = courseKey.split("-")
     dept = courseKeySplit[0]
