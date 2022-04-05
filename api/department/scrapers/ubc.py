@@ -1,10 +1,11 @@
+import re
 import traceback
 from bs4 import BeautifulSoup
-import re
 
 from api.redis.constants.datatypes import DEPARTMENT_DATA_TYPE
-from ...selenium import driver
-from ...utils.url import generateUrl
+from api.selenium import driver
+
+from api.utils.url import generateUbcUrl
 
 RE_STRING_HEADER_CLASS = re.compile('listHeader')
 RE_STRING_ALLOWED_CHARACTERS = r'[^a-zA-Z0-9 ]'
@@ -13,7 +14,7 @@ def scrapeDepartmentInformation():
     departmentInfo = []
     try:
         # do this initially to test connection
-        driver.get(generateUrl('DEPARTMENTS'))
+        driver.get(generateUbcUrl('DEPARTMENTS'))
         soup = BeautifulSoup(driver.page_source, 'html.parser')
         main_table = soup.find('table', id='mainTable')
         main_table = main_table.find('tbody')

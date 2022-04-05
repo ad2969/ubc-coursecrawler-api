@@ -1,8 +1,8 @@
 from rest_framework import status
-from api.utils.response import ResponseError
 
 from .db import redis_instance
 from .constants.datatypes import COURSE_SEARCH_COUNTER_DATA_TYPE
+from api.utils.response import ResponseError
 
 def logCourse(institution: str, courseKey: str):
     try:

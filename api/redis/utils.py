@@ -1,7 +1,7 @@
 from rest_framework import status
-from api.utils.response import ResponseError
 
 from .db import redis_instance
+from api.utils.response import ResponseError
 
 def getAll(institution: str, dataType: str = None):
     try:

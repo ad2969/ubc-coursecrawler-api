@@ -1,15 +1,14 @@
 import os
 import json
-import traceback
-from rest_framework.views import APIView
-from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
+from api.redis.constants.datatypes import DEPARTMENT_DATA_TYPE
+from api.redis.utils import getAll, getOne, setMultiple, deleteAll
+from .scrapers import departmentScrapers
 
 from api.utils.exceptions import apiExceptionHandler
-from api.utils.response import ResponseError
-from api.redis.utils import getAll, getOne, setMultiple, deleteAll
-from api.redis.constants.datatypes import DEPARTMENT_DATA_TYPE
-from .scrapers import departmentScrapers
 
 class DepartmentListView(APIView):
     @apiExceptionHandler

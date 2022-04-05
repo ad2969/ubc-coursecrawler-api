@@ -1,6 +1,6 @@
 import traceback
-from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.response import Response
 
 from api.redis.constants.institutions import INSTITUTION_CODES
 from api.utils.response import ResponseError

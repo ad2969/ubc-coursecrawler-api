@@ -1,6 +1,6 @@
-from rest_framework.views import APIView
-from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from api.redis.constants.datatypes import COURSE_SEARCH_COUNTER_DATA_TYPE, COURSE_DATA_TYPE
 from api.redis.social import logCourse, getPopularCourses

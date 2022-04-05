@@ -8,12 +8,12 @@ import json
 import traceback
 from bs4 import BeautifulSoup
 
-from api.redis.utils import getOne
 from api.redis.constants.datatypes import COURSE_DATA_TYPE
+from api.redis.utils import getOne
+from api.selenium import driver
 
 from api.utils.exceptions import PageError
-from api.selenium import driver
-from api.utils.url import generateUrl
+from api.utils.url import generateUbcUrl
 
 RE_STRING_PREREQ = re.compile('^(?:Pre-reqs).*$')
 RE_STRING_COREQ = re.compile('^(Co-req).*$')
@@ -158,7 +158,7 @@ def findCourseDependencies(courseCache, newCourses, dept: str, courseNum: str, e
         }
 
         # scrape for course info
-        driver.get(generateUrl('COURSES', dept, courseNum))
+        driver.get(generateUbcUrl('COURSES', dept, courseNum))
         soup = BeautifulSoup(driver.page_source, 'html.parser')
         content_container = soup.find('div', class_=re.compile('content expand'))
 
@@ -218,7 +218,7 @@ def scrapeCourseInformation(courseKey: str):
 
     try:
         # do this initially to test connection
-        driver.get(generateUrl('COURSES', dept, courseNum))
+        driver.get(generateUbcUrl('COURSES', dept, courseNum))
         # start finding dependencies
         mainCourseInfo = findCourseDependencies(courseCache, newCourses, dept, courseNum)
 
