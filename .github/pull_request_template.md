@@ -5,6 +5,8 @@ Also include a list of any dependencies that are required for this change.
 
 Fixes # (issue)
 
+If there is an associated front-end pull request, link this issue as well.
+
 ## Type of Change
 
 Delete options that are not relevant.

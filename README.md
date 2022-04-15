@@ -5,7 +5,11 @@ Web-scraping API for UBC Coursecrawler. The frontend counterpart is [here](https
 
 > **Status** - v0.1 Prototype. See the [CHANGELOG](CHANGELOG.md).
 
-> **Technology Stack** - Django, Selenium, Redis, Heroku
+**Technology Stack**:
+- [Django](https://www.djangoproject.com/) web framework, for implementing API logic
+- [Selenium](https://www.selenium.dev/), for running the browser driver for scraping
+- [Redis](https://redis.io/) database, for storing data
+- [Heroku](https://www.heroku.com/), for hosting the application
 
 **Current functionality**:
 - Retrieves (by recursive scraping through university websites)
@@ -42,9 +46,11 @@ These instructions will get you a copy of the project up and running on your loc
     $ pipenv install
     ```
 
-3. Setup the [environmental files](#environmental-files)
+3. Download the latest version of [chromedriver](https://chromedriver.chromium.org/downloads) and place in the root directory (or somewhere convenient)
 
-4. Start the local server by running the following in the repo directory:
+4. Setup your [environmental files](#environmental-files)
+
+5. Start the local server by running the following in the repo directory:
 
    ```
    $ pipenv run python3 manage.py runserver
@@ -64,6 +70,8 @@ Development is recommended to be done on a system where [pylint](https://pypi.or
 ### Environmental Files
 
 Dotenv files (`.env.*`) are not included in the repository. They contain sensitive variables that are important for running the API. If it's your first time, request them from one of the [repository moderators](#repository-moderators).
+
+Additionally, if developing locally, you will need to add a new variable, `CHROMEDRIVER_PATH`, that contains the path to a valid [chromedriver](https://chromedriver.chromium.org/home)
 
 ### Files and Services
 
@@ -96,15 +104,5 @@ The API is hosted on a [Heroku](https://www.heroku.com/) server with customized 
 
 
 ## Contributing
-Everyone is encouraged to make useful contributions to the project. Instructions to start contributing are as follows:
 
-1. Clone and setup the repo into your local environment (instructions [here](#getting-started))
-2. Draft out the changes to be made and discuss with one of the moderators (ideally, [start an issue](https://github.com/ad2969/ubc-coursecrawler-api/issues) or pick an existing one)
-3. Make the appropriate edits and additions in a new branch (use a unique name in *kebab-case*, see [naming conventions](https://namingconvention.org/git/branch-naming.html))
-4. Submit a pull request with a detailed description of the changes that were made
---> Pull requests will be accepted after being reviewed and after appropriate testing
-5. After merging to `master`, [deploy](#deployment) the application as a new version.
-
-### Repository Moderators
-
-* @ad2969
+See [CONTRIBUTING][CONTRIBUTING.md]
