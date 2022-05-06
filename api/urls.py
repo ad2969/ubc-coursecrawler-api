@@ -24,8 +24,8 @@ urlpatterns = [
     # COURSE LINKS
     path("api/courses/<str:institution>", CourseListView.as_view()),
     path("api/courses/<str:institution>/popular", PopularCourseListView.as_view()),
-    path("api/course/<str:institution>/<str:id>", CourseDetailView.as_view()),
+    path("api/course/<str:institution>/<str:courseId>", CourseDetailView.as_view()),
     # DEPARTMENT LINKS
     path("api/departments/<str:institution>", DepartmentListView.as_view()),
-    path("api/department/<str:institution>/<str:id>", DepartmentDetailView.as_view()),
+    path("api/department/<str:institution>/<str:deptId>", DepartmentDetailView.as_view()),
 ]
