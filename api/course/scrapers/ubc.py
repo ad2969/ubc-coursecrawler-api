@@ -18,9 +18,11 @@ from api.utils.exceptions import PageError
 from api.utils.regex import isStringACourse
 from api.utils.url import generateUbcUrl
 
+SESSIONS_TO_CHECK = ["W", "S"]
+
 RE_STRING_PREREQ = re.compile("^(?:Pre-reqs).*$")
 RE_STRING_COREQ = re.compile("^(Co-req).*$")
-RE_STRING_NOOFFER = re.compile("no longer offered")
+RE_STRING_NOOFFER = re.compile(".*no.*offered.*")
 
 RE_STRING_REQUIRED_COURSES = [
     [0, re.compile("(?:All of|all of)")],
@@ -32,12 +34,35 @@ RE_STRING_REQUIRED_COURSES = [
 ]
 
 def filterPrereqContainer(tag):
+    """
+    Helper function to find the PageElement container that contains the course prereqs
+
+    :param tag: PageElement to check
+    :type tag: PageElement
+    :returns: Boolean value whether the container is a prereq container
+    :rtype: boolean
+    """
     return tag.name == "p" and len(tag.contents) and RE_STRING_PREREQ.match(tag.contents[0].get_text())
 
 def filterCoreqContainer(tag):
+    """
+    Helper function to find the PageElement container that contains the course coreqs
+
+    :param tag: PageElement to check
+    :type tag: PageElement
+    :returns: Boolean value whether the container is a prereq container
+    :rtype: boolean
+    """
     return tag.name == "p" and len(tag.contents) and RE_STRING_COREQ.match(tag.contents[0].get_text())
 
 def checkCourseNotOffered(container):
+    """
+    Checks the page for an indication that the course is not offered for the current session
+    
+    The "current term" refers to the default term that is selected when the page is loaded.
+    Eg: opening the page between May - September will load the "Summer" session, while
+        opening the page at other times will load the "Winter" session
+    """
     try:
         return any(RE_STRING_NOOFFER.search(content.get_text()) for content in container.contents)
     except:
@@ -45,12 +70,26 @@ def checkCourseNotOffered(container):
         raise
 
 def checkNumberOfCoursesRequired(line):
-    for NUM_CRIT in RE_STRING_REQUIRED_COURSES:
-        if NUM_CRIT[1].search(line): return NUM_CRIT[0]
+    """
+    Helper function for scraping course prereqs and coreqs from a PageElement container
+    The function counts the number of courses that are "required" by comparing the text with known regex criteria
+    """
+    for RE_KNOWN_TEXT_FORMAT in RE_STRING_REQUIRED_COURSES:
+        if RE_KNOWN_TEXT_FORMAT[1].search(line): return RE_KNOWN_TEXT_FORMAT[0]
     return -1 # if no match, this line is not a prereq indicator
 
-def getCoursePrereqs(container):
-    prereqs = [] # collect prereqs
+def scrapeCoursePrereqs(container):
+    """
+    Scrapes a PageElement for "prereqs", taking into account that some
+    prereqs may be "grouped together" as options
+    (eg: "one of CPSC101, CPSC103")
+
+    :param container: The DOM container that contains all the prereq info
+    :type container: PageElement
+    :returns: a list of "prereq objects" (see below)
+    :rtype: list
+    """
+    prereqs = [] # for storing prereqs
     requiredCourses = 0 # number of courses required in the group
     prereqGroupCounter = -1
 
@@ -87,7 +126,17 @@ def getCoursePrereqs(container):
 
     return prereqs
 
-def getCourseCoreqs(container):
+def scrapeCourseCoreqs(container):
+    """
+    Scrapes a PageElement for "coreqs", taking into account that some
+    coreqs may be "grouped together" as options
+    (eg: "one of CPSC101, CPSC103")
+
+    :param container: The DOM container that contains all the prereq info
+    :type container: PageElement
+    :returns: a list of "coreq objects" (see below)
+    :rtype: list
+    """
     coreqs = [] # collect coreqs
     requiredCourses = 0 # number of courses required in the group
     coreqGroupCounter = -1
@@ -130,7 +179,11 @@ def getCourseCoreqs(container):
     return coreqs
 
 def findCourseDependencies(courseCache, newCourses, dept: str, courseNum: str, extraAttribs: dict = {}):
-    # if already cached, don"t repeat the computation
+    """
+    Recursive function that traverses through course prereqs (dependencies) in a DFS-ish method,
+    returning a nested object containing complete information about the course and all of its prereqs
+    """
+    # if already cached locally, don"t repeat the computation
     courseKey = (f"{dept}-{courseNum}").upper()
     if courseKey in courseCache: return courseCache[courseKey]
 
@@ -164,27 +217,40 @@ def findCourseDependencies(courseCache, newCourses, dept: str, courseNum: str, e
             "children": [],
         }
 
-        # scrape for course info
-        driver.get(generateUbcUrl("COURSES", dept, courseNum))
-        soup = BeautifulSoup(driver.page_source, "html.parser")
-        content_container = soup.find("div", class_=re.compile("content expand"))
+        sessionsChecked = 0 # safety counter to prevent infinite loop
 
-        if not content_container: # means something is wrong with the page
-            raise PageError("Page layout unrecognized")
+        # scrape the page for course info
+        # we encase in a while loop to acommodate the use case where:
+        #   a course is not offered during "the current term", but may be offered in another
+        # because of this, if we find that the course is not offered for the current term
+        # we need to check for other sessions as well
+        while (True): # simulate a "do while" loop
 
-        # check if the course is offered, 
-        if checkCourseNotOffered(content_container): # return if course is not offered
-            courseInfo["attributes"]["status"] = "NOT_OFFERED"
-            print(f"DEBUG (scrape_course): {dept} {courseNum} not offered")
-            return courseInfo
+            driver.get(generateUbcUrl("COURSES", dept, courseNum, SESSIONS_TO_CHECK[0]))
+            soup = BeautifulSoup(driver.page_source, "html.parser")
+            content_container = soup.find("div", class_=re.compile("content expand"))
+
+            if not content_container: # means something is wrong with the page
+                raise PageError("Page layout unrecognized")
+
+            # check if the course is offered, 
+            if checkCourseNotOffered(content_container):
+                sessionsChecked += 1
+                if sessionsChecked == len(SESSIONS_TO_CHECK):
+                    # if all sessions already checked, it is confirmed to not be offered
+                    courseInfo["attributes"]["status"] = "NOT_OFFERED"
+                    print(f"DEBUG (scrape_course): {dept} {courseNum} not offered")
+                    return courseInfo
+            else:
+                break
 
         # if offered, get prereq containers and coreq containers
         prereqContainer = content_container.find_all(filterPrereqContainer)
         coreqContainer = content_container.find_all(filterCoreqContainer)
 
         # get list of prereqs and coreqs, if any
-        prereqs = [] if not len(prereqContainer) else getCoursePrereqs(prereqContainer[0]) 
-        coreqs = [] if not len(coreqContainer) else getCourseCoreqs(coreqContainer[0]) 
+        prereqs = [] if not len(prereqContainer) else scrapeCoursePrereqs(prereqContainer[0]) 
+        coreqs = [] if not len(coreqContainer) else scrapeCourseCoreqs(coreqContainer[0]) 
 
         # recurse here for each prereq
         if len(prereqs):
@@ -207,9 +273,9 @@ def findCourseDependencies(courseCache, newCourses, dept: str, courseNum: str, e
         return courseInfo
 
 def scrapeCourseInformation(courseKey: str):
-    courseCache = {} # memoization for if recursive scraping sees the same node
-    newCourses = {} # new courses to save into redis
-    mainCourseInfo = {} # the main course being queried
+    courseCache = {} # memoization for when recursive scraping sees the same node
+    newCourses = {} # for storing new courses to save into redis
+    mainCourseInfo = {} # for storing the main course being queried
 
     courseKeySplit = courseKey.split("-")
     dept = courseKeySplit[0]

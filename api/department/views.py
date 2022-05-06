@@ -55,6 +55,6 @@ class DepartmentListView(APIView):
 
 class DepartmentDetailView(APIView):
     @apiExceptionHandler
-    def get(self, request, institution, id=None):
-        response = getOne(institution, DEPARTMENT_DATA_TYPE, id.upper())
+    def get(self, request, institution, deptId):
+        response = getOne(institution, DEPARTMENT_DATA_TYPE, deptId.upper())
         return Response(response, status=response["code"])

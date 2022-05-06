@@ -1,4 +1,6 @@
-def generateUbcUrl(type: str, dept: str = "", courseNum: str = ""):
+from datetime import datetime
+
+def generateUbcUrl(type: str, dept: str = "", courseNum: str = "", session: str = "W"):
     BASE_URL = "https://courses.students.ubc.ca"
     PAGE_NAME = "subjarea"
     TABLE_NAME = {
@@ -16,5 +18,8 @@ def generateUbcUrl(type: str, dept: str = "", courseNum: str = ""):
     else:
         url += "&tname=" + TABLE_NAME["COURSE"]
         url += "&dept=" + dept + "&course=" + courseNum
+
+    url += "&sessyr=" + str(datetime.now().year)
+    url += "&sesscd=" + session
 
     return url

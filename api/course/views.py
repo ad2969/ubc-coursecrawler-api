@@ -40,17 +40,16 @@ class CourseListView(APIView):
 
 class CourseDetailView(APIView):
     @apiExceptionHandler
-    def get(self, request, institution, id):
+    def get(self, request, institution, courseId):
         forceScrapeParam = request.query_params.get("forceScrape") # to force a scrape
         preventSaveParam = request.query_params.get("preventSave") # to prevent saving scraped data
 
-        courseKey = id.upper()
+        courseKey = courseId.upper()
 
-        # if exists in the database
+        # if scraping is not forced, check if it already exists in the database
         if not forceScrapeParam:
             existingCourse = getOne(institution, COURSE_DATA_TYPE, courseKey)
 
-            # if exists in redis
             if existingCourse["data"]:
                 return Response(existingCourse, status=existingCourse["code"])
 
